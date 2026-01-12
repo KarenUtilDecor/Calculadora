@@ -16,8 +16,6 @@ const Auth: React.FC = () => {
         e.preventDefault();
         setLoading(true);
         setError(null);
-        // ... rest of existing handleSubmit logic ...
-
 
         // Timeout promise
         const timeoutPromise = new Promise((_, reject) => {
@@ -61,160 +59,209 @@ const Auth: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen w-full bg-background flex items-center justify-center p-4 relative overflow-hidden">
-            {/* Background Orbs */}
-            <div className="absolute top-0 -left-20 w-80 h-80 bg-primary/10 rounded-full blur-[120px] pointer-events-none"></div>
-            <div className="absolute bottom-0 -right-20 w-80 h-80 bg-primary/10 rounded-full blur-[120px] pointer-events-none"></div>
+        <div className="min-h-screen w-full bg-[#050505] flex items-center justify-center p-4 relative overflow-hidden font-sans">
+            {/* Mesh Gradient Background Fragments */}
+            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/20 rounded-full blur-[140px] animate-pulse-slow"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-500/10 rounded-full blur-[140px] animate-pulse-slow font-delay-2000"></div>
+            <div className="absolute top-[20%] right-[10%] w-[30%] h-[30%] bg-primary/10 rounded-full blur-[100px] animate-pulse-slow font-delay-4000"></div>
 
-            <div className="w-full max-w-md z-10">
+            {/* Glass Background Pattern */}
+            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none brightness-50 contrast-150"></div>
+
+            <div className="w-full max-w-md z-10 animate-fade-in-up">
                 <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center size-20 rounded-2xl bg-primary/20 text-primary mb-6 ring-1 ring-primary/30 shadow-glow shadow-primary/20">
-                        <span className="material-symbols-outlined text-4xl">payments</span>
+                    <div className="relative inline-block">
+                        <div className="absolute inset-0 bg-primary/40 rounded-3xl blur-2xl animate-pulse"></div>
+                        <div className="relative size-20 rounded-3xl bg-gradient-to-br from-primary/30 to-primary/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-glow shadow-primary/30">
+                            <span className="material-symbols-outlined text-4xl text-white drop-shadow-lg">payments</span>
+                        </div>
                     </div>
-                    <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Precifica Pro</h1>
-                    <p className="text-text-sec">Gerencie seus lucros com inteligência</p>
+                    <h1 className="mt-8 text-4xl font-black text-white tracking-tighter sm:text-5xl">
+                        Precifica <span className="text-primary italic">Pro</span>
+                    </h1>
+                    <p className="mt-2 text-text-sec text-sm font-medium tracking-wide uppercase">O futuro da sua precificação</p>
                 </div>
 
-                <div className="bg-surface-card rounded-3xl p-8 border border-border shadow-2xl relative overflow-hidden">
-                    <div className="flex gap-2 mb-8 p-1 bg-background rounded-2xl">
-                        <button
-                            onClick={() => setIsLogin(true)}
-                            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${isLogin ? 'bg-primary text-white shadow-lg' : 'text-text-sec hover:text-white'
-                                }`}
-                        >
-                            Login
-                        </button>
-                        <button
-                            onClick={() => setIsLogin(false)}
-                            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${!isLogin ? 'bg-primary text-white shadow-lg' : 'text-text-sec hover:text-white'
-                                }`}
-                        >
-                            Cadastro
-                        </button>
-                    </div>
+                <div className="relative group">
+                    {/* Shadow behind the card */}
+                    <div className="absolute -inset-1 bg-gradient-to-r from-primary/50 to-indigo-500/50 rounded-[2.5rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        {error && (
-                            <div className="p-4 bg-danger/10 border border-danger/20 rounded-xl flex items-center gap-3 text-danger text-sm font-medium animate-shake">
-                                <span className="material-symbols-outlined text-[20px]">error</span>
-                                {error}
-                            </div>
-                        )}
+                    <div className="relative bg-white/[0.03] backdrop-blur-2xl rounded-[2rem] p-8 border border-white/10 shadow-3xl">
+                        <div className="flex gap-2 mb-10 p-1.5 bg-black/40 rounded-2xl border border-white/5">
+                            <button
+                                onClick={() => setIsLogin(true)}
+                                className={`flex-1 py-3.5 rounded-xl text-sm font-bold transition-all duration-500 ${isLogin
+                                    ? 'bg-primary text-white shadow-xl shadow-primary/20 scale-[1.02]'
+                                    : 'text-text-sec hover:text-white hover:bg-white/5'
+                                    }`}
+                            >
+                                Entrar
+                            </button>
+                            <button
+                                onClick={() => setIsLogin(false)}
+                                className={`flex-1 py-3.5 rounded-xl text-sm font-bold transition-all duration-500 ${!isLogin
+                                    ? 'bg-primary text-white shadow-xl shadow-primary/20 scale-[1.02]'
+                                    : 'text-text-sec hover:text-white hover:bg-white/5'
+                                    }`}
+                            >
+                                Cadastrar
+                            </button>
+                        </div>
 
-                        {!isLogin && (
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            {error && (
+                                <div className="p-4 bg-danger/10 border border-danger/20 rounded-2xl flex items-center gap-3 text-danger text-sm font-bold animate-shake">
+                                    <span className="material-symbols-outlined text-xl">error_outline</span>
+                                    {error}
+                                </div>
+                            )}
+
+                            {!isLogin && (
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-text-sec uppercase tracking-widest ml-1 opacity-70">Nome Completo</label>
+                                    <div className="relative group/field">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-text-sec group-focus-within/field:text-primary transition-colors">
+                                            <span className="material-symbols-outlined text-xl">person</span>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={fullName}
+                                            onChange={(e) => setFullName(e.target.value)}
+                                            className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-white/20 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 outline-none transition-all"
+                                            placeholder="Seu nome"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="space-y-2">
-                                <span className="text-xs font-bold text-text-sec uppercase tracking-widest ml-1">Nome Completo</span>
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-text-sec group-focus-within:text-primary transition-colors">
-                                        <span className="material-symbols-outlined text-[20px]">person</span>
+                                <label className="text-xs font-bold text-text-sec uppercase tracking-widest ml-1 opacity-70">Seu Melhor E-mail</label>
+                                <div className="relative group/field">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-text-sec group-focus-within/field:text-primary transition-colors">
+                                        <span className="material-symbols-outlined text-xl">alternate_email</span>
                                     </div>
                                     <input
-                                        type="text"
+                                        type="email"
                                         required
-                                        value={fullName}
-                                        onChange={(e) => setFullName(e.target.value)}
-                                        className="w-full bg-input-surface border border-border rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                        placeholder="Seu nome"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-white/20 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 outline-none transition-all"
+                                        placeholder="exemplo@email.com"
                                     />
                                 </div>
                             </div>
-                        )}
 
-                        <div className="space-y-2">
-                            <span className="text-xs font-bold text-text-sec uppercase tracking-widest ml-1">Email</span>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-text-sec group-focus-within:text-primary transition-colors">
-                                    <span className="material-symbols-outlined text-[20px]">alternate_email</span>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-text-sec uppercase tracking-widest ml-1 opacity-70">Sua Senha</label>
+                                <div className="relative group/field">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-text-sec group-focus-within/field:text-primary transition-colors">
+                                        <span className="material-symbols-outlined text-xl">lock_open</span>
+                                    </div>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-white/20 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 outline-none transition-all"
+                                        placeholder="••••••••"
+                                    />
                                 </div>
-                                <input
-                                    type="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full bg-input-surface border border-border rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                    placeholder="seu@email.com"
-                                />
                             </div>
-                        </div>
 
-                        <div className="space-y-2">
-                            <span className="text-xs font-bold text-text-sec uppercase tracking-widest ml-1">Senha</span>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-text-sec group-focus-within:text-primary transition-colors">
-                                    <span className="material-symbols-outlined text-[20px]">lock</span>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full relative group/btn overflow-hidden rounded-2xl"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-r from-primary to-indigo-600 transition-all duration-500 group-hover/btn:scale-110"></div>
+                                <div className={`relative w-full py-4.5 text-white text-base font-black flex items-center justify-center gap-3 transition-all ${loading ? 'opacity-80' : 'group-active/btn:scale-95'}`}>
+                                    {loading ? (
+                                        <div className="size-6 border-3 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                    ) : (
+                                        <>
+                                            <span>{isLogin ? 'Iniciar Sessão' : 'Criar minha conta'}</span>
+                                            <span className="material-symbols-outlined text-xl animate-bounce-x">arrow_forward</span>
+                                        </>
+                                    )}
                                 </div>
-                                <input
-                                    type="password"
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-input-surface border border-border rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                    placeholder="••••••••"
-                                />
-                            </div>
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-primary hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-white text-base font-bold py-4 rounded-xl shadow-lg shadow-primary/20 transition-all hover:-translate-y-1 active:scale-[0.98] flex items-center justify-center gap-2 mt-4"
-                        >
-                            {loading ? (
-                                <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                            ) : (
-                                <>
-                                    <span>{isLogin ? 'Entrar Agora' : 'Criar Conta'}</span>
-                                    <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
-                                </>
-                            )}
-                        </button>
-                    </form>
+                            </button>
+                        </form>
+                    </div>
                 </div>
 
-                <p className="text-center mt-8 text-sm text-text-sec">
-                    {isLogin ? 'Esqueceu sua senha?' : 'Ao se cadastrar você aceita nossos termos.'}
-                    <button className="text-primary font-bold ml-1 hover:underline">Saiba mais</button>
-                </p>
+                <div className="text-center mt-12 space-y-4">
+                    <p className="text-sm text-text-sec/60">
+                        {isLogin ? 'Teve problemas para entrar?' : 'Já possui uma conta ativa?'}
+                        <button
+                            onClick={() => setIsLogin(!isLogin)}
+                            className="text-primary font-bold ml-1.5 hover:text-primary-light transition-colors"
+                        >
+                            {isLogin ? 'Recuperar acesso' : 'Fazer login'}
+                        </button>
+                    </p>
 
-                <div className="mt-8 flex flex-col items-center gap-2">
-                    <button
-                        onClick={async () => {
-                            setConnectionStatus('Testando...');
-                            const start = performance.now();
-                            try {
-                                const { error } = await supabase.from('profiles').select('count', { count: 'exact', head: true });
-                                const end = performance.now();
-                                const latency = Math.round(end - start);
-                                if (error && error.code !== 'PGRST116') {
-                                    setConnectionStatus(`Erro: ${error.message} (${latency}ms)`);
-                                } else {
-                                    setConnectionStatus(`Conexão Supabase: OK! Latência: ${latency}ms`);
+                    <div className="flex flex-col items-center gap-3">
+                        <button
+                            onClick={async () => {
+                                setConnectionStatus('Sincronizando...');
+                                const start = performance.now();
+                                try {
+                                    const { error } = await supabase.from('profiles').select('count', { count: 'exact', head: true });
+                                    const end = performance.now();
+                                    const latency = Math.round(end - start);
+                                    if (error && error.code !== 'PGRST116') {
+                                        setConnectionStatus(`Falha: ${error.message} (${latency}ms)`);
+                                    } else {
+                                        setConnectionStatus(`Supabase Online • ${latency}ms`);
+                                    }
+                                } catch (err: any) {
+                                    setConnectionStatus(`Offline: ${err.message}`);
                                 }
-                            } catch (err: any) {
-                                setConnectionStatus(`Erro de rede: ${err.message}`);
-                            }
-                        }}
-                        className="text-xs text-text-sec/50 hover:text-primary transition-colors flex items-center gap-1"
-                    >
-                        <span className="material-symbols-outlined text-[14px]">wifi</span>
-                        Testar Conexão
-                    </button>
-                    {connectionStatus && (
-                        <span className={`text-xs font-bold ${connectionStatus.includes('Erro') ? 'text-danger' : 'text-green-500'}`}>
-                            {connectionStatus}
-                        </span>
-                    )}
+                            }}
+                            className="bg-white/[0.02] border border-white/5 px-4 py-2 rounded-full text-[10px] font-bold text-text-sec/40 hover:text-white hover:bg-white/10 hover:border-white/10 transition-all flex items-center gap-2 group/status"
+                        >
+                            <span className={`size-1.5 rounded-full ${connectionStatus?.includes('Falha') || connectionStatus?.includes('Offline') ? 'bg-error' : connectionStatus ? 'bg-success animate-pulse' : 'bg-text-sec/30'}`}></span>
+                            {connectionStatus || 'Status do Servidor'}
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <style>{`
-                @keyframes animate-shake {
-                    0%, 100% { transform: translateX(0); }
-                    25% { transform: translateX(-5px); }
-                    75% { transform: translateX(5px); }
+                @keyframes fade-in-up {
+                    from { opacity: 0; transform: translateY(20px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
-                .animate-shake {
-                    animation: animate-shake 0.3s ease-in-out;
+                @keyframes pulse-slow {
+                    0%, 100% { transform: scale(1) translate(0, 0); opacity: 0.2; }
+                    50% { transform: scale(1.1) translate(2% , 3%); opacity: 0.3; }
+                }
+                @keyframes bounce-x {
+                    0%, 100% { transform: translateX(0); }
+                    50% { transform: translateX(5px); }
+                }
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    20%, 60% { transform: translateX(-4px); }
+                    40%, 80% { transform: translateX(4px); }
+                }
+                .animate-fade-in-up { animation: fade-in-up 1s cubic-bezier(0.16, 1, 0.3, 1); }
+                .animate-pulse-slow { animation: pulse-slow 8s ease-in-out infinite; }
+                .animate-bounce-x { animation: bounce-x 1s ease-in-out infinite; }
+                .animate-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+                .font-delay-2000 { animation-delay: 2s; }
+                .font-delay-4000 { animation-delay: 4s; }
+                
+                ::-webkit-scrollbar {
+                    width: 5px;
+                }
+                ::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                ::-webkit-scrollbar-thumb {
+                    background: rgba(255,255,255,0.1);
+                    border-radius: 10px;
                 }
             `}</style>
         </div>
