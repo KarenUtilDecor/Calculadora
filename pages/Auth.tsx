@@ -16,16 +16,24 @@ const Auth: React.FC = () => {
         setLoading(true);
         setError(null);
 
+        // Timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('A conexão demorou muito. Verifique sua internet e tente novamente.')), 10000);
+        });
+
         try {
             if (isLogin) {
-                const { error } = await supabase.auth.signInWithPassword({
+                const loginPromise = supabase.auth.signInWithPassword({
                     email,
                     password,
                 });
+
+                const { error } = await Promise.race([loginPromise, timeoutPromise]) as any;
+
                 if (error) throw error;
                 navigate('/');
             } else {
-                const { error } = await supabase.auth.signUp({
+                const signUpPromise = supabase.auth.signUp({
                     email,
                     password,
                     options: {
@@ -34,11 +42,15 @@ const Auth: React.FC = () => {
                         },
                     },
                 });
+
+                const { error } = await Promise.race([signUpPromise, timeoutPromise]) as any;
+
                 if (error) throw error;
                 alert('Cadastro realizado! Se necessário, verifique seu e-mail.');
                 setIsLogin(true);
             }
         } catch (err: any) {
+            console.error('Erro no login/cadastro:', err);
             setError(err.message || 'Ocorreu um erro.');
         } finally {
             setLoading(false);
