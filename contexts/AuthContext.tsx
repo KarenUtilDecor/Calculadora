@@ -39,18 +39,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         const initAuth = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-                const isApproved = await checkApproval(session.user);
-                if (isApproved) {
-                    setSession(session);
-                    setUser(session.user);
-                } else {
-                    setSession(null);
-                    setUser(null);
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) throw error;
+
+                if (session?.user) {
+                    const isApproved = await checkApproval(session.user);
+                    if (isApproved) {
+                        setSession(session);
+                        setUser(session.user);
+                    } else {
+                        setSession(null);
+                        setUser(null);
+                    }
                 }
+            } catch (error) {
+                console.error('Erro na inicialização da auth:', error);
+                // Não desconectamos aqui para permitir que o usuário tente login novamente se for erro de rede
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         initAuth();
