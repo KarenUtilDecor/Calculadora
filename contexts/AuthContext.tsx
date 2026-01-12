@@ -72,7 +72,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         };
 
-        initAuth();
+        // Timeout de segurança: desativa loading após 5 segundos mesmo se houver problemas
+        const timeoutId = setTimeout(() => {
+            console.warn('Auth initialization timeout - forcing loading to false');
+            setLoading(false);
+        }, 5000);
+
+        initAuth().finally(() => clearTimeout(timeoutId));
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session?.user) {
