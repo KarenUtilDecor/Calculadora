@@ -6,6 +6,7 @@ import SavedProducts from './pages/SavedProducts';
 import Auth from './pages/Auth';
 import { ProductData, CalculationResult } from './types';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { supabase } from './lib/supabase';
 
 // --- Context Setup ---
 interface AppContextType {
@@ -27,15 +28,76 @@ export const useApp = () => {
 };
 
 const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { user } = useAuth();
     const [currentProduct, setCurrentProduct] = useState<ProductData | null>(null);
     const [currentResult, setCurrentResult] = useState<CalculationResult | null>(null);
     const [savedResults, setSavedResults] = useState<CalculationResult[]>([]);
 
-    const saveResult = (result: CalculationResult) => {
-        setSavedResults(prev => [result, ...prev]);
+    useEffect(() => {
+        if (user) {
+            fetchSavedResults();
+        } else {
+            setSavedResults([]);
+        }
+    }, [user]);
+
+    const fetchSavedResults = async () => {
+        const { data, error } = await supabase
+            .from('saved_results')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching results:', error);
+            return;
+        }
+
+        if (data) {
+            setSavedResults(data.map((row: any) => ({
+                ...row.result,
+                dbId: row.id // Mantemos o ID do banco para deleção
+            })));
+        }
     };
 
-    const deleteResult = (id: string) => {
+    const saveResult = async (result: CalculationResult) => {
+        if (!user) return;
+
+        const { data, error } = await supabase
+            .from('saved_results')
+            .insert([{ user_id: user.id, result }])
+            .select();
+
+        if (error) {
+            console.error('Error saving result:', error);
+            alert('Erro ao salvar produto no banco de dados.');
+            return;
+        }
+
+        if (data) {
+            const newEntry = { ...result, dbId: data[0].id };
+            setSavedResults(prev => [newEntry, ...prev]);
+        }
+    };
+
+    const deleteResult = async (id: string) => {
+        // Procuramos o item para pegar o dbId
+        const itemToDelete = savedResults.find(r => r.product.id === id);
+        const dbId = (itemToDelete as any)?.dbId;
+
+        if (dbId) {
+            const { error } = await supabase
+                .from('saved_results')
+                .delete()
+                .eq('id', dbId);
+
+            if (error) {
+                console.error('Error deleting result:', error);
+                alert('Erro ao excluir produto do banco de dados.');
+                return;
+            }
+        }
+
         setSavedResults(prev => prev.filter(r => r.product.id !== id));
     };
 
@@ -103,23 +165,65 @@ const Sidebar = () => {
     const location = useLocation();
     const { user, signOut } = useAuth();
     const { isCollapsed, toggleSidebar } = useSidebar();
-    const [profileImage, setProfileImage] = useState(localStorage.getItem('user_profile_image') || '');
+    const [profileImage, setProfileImage] = useState('');
     const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    // Carregar imagem de perfil do Supabase
+    useEffect(() => {
+        if (!user) return;
+
+        const loadProfile = async () => {
+            const { data } = await supabase
+                .from('profiles')
+                .select('avatar_url')
+                .eq('id', user.id)
+                .single();
+
+            if (data?.avatar_url) {
+                setProfileImage(data.avatar_url);
+            }
+        };
+
+        loadProfile();
+    }, [user]);
 
     const handleImageClick = () => {
         fileInputRef.current?.click();
     };
 
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64 = reader.result as string;
-                setProfileImage(base64);
-                localStorage.setItem('user_profile_image', base64);
-            };
-            reader.readAsDataURL(file);
+        if (!file || !user) return;
+
+        try {
+            // Upload para Storage
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            // Obter URL pública
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            // Atualizar perfil
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ avatar_url: publicUrl })
+                .eq('id', user.id);
+
+            if (updateError) throw updateError;
+
+            setProfileImage(publicUrl);
+        } catch (error) {
+            console.error('Erro ao atualizar foto:', error);
+            alert('Erro ao atualizar foto de perfil.');
         }
     };
 

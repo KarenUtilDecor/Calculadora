@@ -1,0 +1,59 @@
+:root {
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+  --sar: env(safe-area-inset-right);
+}
+
+/* Reset básico e ajustes para PWA/Mobile */
+body {
+  margin: 0;
+  padding: 0;
+  /* Garante que o app ocupe a altura correta considerando a barra de navegação móvel dinâmica */
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* Evita o "overscroll" (bouncing) na página inteira, permitindo apenas nos contêineres de scroll */
+  overscroll-behavior-y: none;
+  /* Suporte para o notch do iPhone */
+  padding-top: var(--sat);
+  padding-bottom: var(--sab);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+  /* Remove highlight cinza de toque no iOS */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Evita zoom automático em inputs no iOS */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Melhora a experiência de "app nativo" desabilitando seleção de texto em elementos de UI */
+button, 
+a, 
+.material-symbols-outlined,
+[role="button"] {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Estilização da barra de rolagem para ficar mais sutil */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}

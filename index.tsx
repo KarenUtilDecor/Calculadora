@@ -1,6 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { registerSW } from 'virtual:pwa-register';
+
+// Registra o Service Worker para suporte PWA
+registerSW({ immediate: true });
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

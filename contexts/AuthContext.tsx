@@ -17,17 +17,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-        });
+        const checkApproval = async (user: User | null) => {
+            if (!user) return true;
 
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-            setUser(session?.user ?? null);
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('approved')
+                    .eq('id', user.id)
+                    .single();
+
+                if (error || !data || data.approved === false) {
+                    await supabase.auth.signOut();
+                    return false;
+                }
+                return true;
+            } catch (err) {
+                await supabase.auth.signOut();
+                return false;
+            }
+        };
+
+        const initAuth = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                const isApproved = await checkApproval(session.user);
+                if (isApproved) {
+                    setSession(session);
+                    setUser(session.user);
+                } else {
+                    setSession(null);
+                    setUser(null);
+                }
+            }
+            setLoading(false);
+        };
+
+        initAuth();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session?.user) {
+                const isApproved = await checkApproval(session.user);
+                if (!isApproved) {
+                    setSession(null);
+                    setUser(null);
+                    alert('Sua conta aguarda aprovação do administrador.');
+                } else {
+                    setSession(session);
+                    setUser(session.user);
+                }
+            } else if (event === 'SIGNED_OUT') {
+                setSession(null);
+                setUser(null);
+            } else {
+                setSession(session);
+                setUser(session?.user ?? null);
+            }
             setLoading(false);
         });
 
