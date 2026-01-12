@@ -273,7 +273,7 @@ const Calculator: React.FC = () => {
     };
 
     return (
-        <div className="w-full max-w-7xl mx-auto px-2 py-2 lg:px-4 lg:pt-2 flex flex-col gap-2 h-screen overflow-hidden">
+        <div className="w-full max-w-7xl mx-auto px-2 py-2 lg:px-4 lg:pt-2 flex flex-col gap-2">
             <h1 className="text-xl font-bold text-white leading-tight text-center mb-2">Calculadora</h1>
 
             <div className="lg:grid lg:grid-cols-12 lg:gap-3 lg:items-start h-full">
