@@ -17,7 +17,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const checkApproval = async (user: User | null) => {
+        const checkApproval = async (user: User | null): Promise<boolean> => {
             if (!user) return true;
 
             try {
@@ -27,14 +27,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     .eq('id', user.id)
                     .single();
 
-                if (error || !data || data.approved === false) {
-                    await supabase.auth.signOut();
+                // Se houver erro de rede ou banco, permitir o login para não bloquear o usuário
+                if (error) {
+                    console.warn('Erro ao verificar aprovação:', error);
+                    // Se o perfil não existe (PGRST116), podemos criar depois, mas permitir login
+                    if (error.code === 'PGRST116') {
+                        return true; // Perfil não existe, mas permite login
+                    }
+                    return true; // Outros erros também permitem login para não travar
+                }
+
+                // Só bloqueia se o usuário explicitamente não for aprovado
+                if (data && data.approved === false) {
                     return false;
                 }
+
                 return true;
             } catch (err) {
-                await supabase.auth.signOut();
-                return false;
+                console.error('Exceção ao verificar aprovação:', err);
+                return true; // Em caso de exceção, permite login para não travar
             }
         };
 
