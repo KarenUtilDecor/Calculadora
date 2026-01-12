@@ -61,12 +61,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     };
 
     const saveResult = async (result: CalculationResult) => {
-        if (!user) {
-            // Se não houver usuário, apenas adicionamos ao estado local para visualização na sessão
-            const newEntry = { ...result, product: { ...result.product, id: Date.now().toString() } };
-            setSavedResults(prev => [newEntry, ...prev]);
-            return;
-        }
+        if (!user) return;
 
         const { data, error } = await supabase
             .from('saved_results')
@@ -133,7 +128,10 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         );
     }
 
-    // Permitir acesso mesmo sem usuário
+    if (!user) {
+        return <Navigate to="/auth" replace />;
+    }
+
     return <>{children}</>;
 };
 
@@ -240,23 +238,10 @@ const Sidebar = () => {
         >
             <div className={`p-6 flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
                 <div className="size-10 min-w-[40px] rounded-xl bg-primary/20 text-primary flex items-center justify-center ring-1 ring-primary/30 shadow-glow shadow-primary/20">
-                    <span className="material-symbols-outlined">payments</span>
+                    <span className="material-symbols-outlined">sell</span>
                 </div>
                 {!isCollapsed && <h1 className="text-xl font-extrabold text-white tracking-tight truncate">Precifica Pro</h1>}
             </div>
-
-            {!user && (
-                <div className="px-4 py-2">
-                    <button
-                        onClick={() => navigate('/auth')}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all ${isCollapsed ? 'justify-center px-0' : ''}`}
-                        title="Entrar"
-                    >
-                        <span className="material-symbols-outlined">login</span>
-                        {!isCollapsed && <span>Entrar</span>}
-                    </button>
-                </div>
-            )}
 
             <nav className="flex-1 px-4 py-6 flex flex-col gap-2">
                 <button
@@ -337,11 +322,10 @@ const Sidebar = () => {
 
                 {user && (
                     <button
-                        onClick={() => {
-                            if (window.confirm('Deseja sair?')) {
-                                signOut();
-                                navigate('/auth');
-                            }
+                        onClick={async () => {
+                            // Removido confirm para testar se desbloqueia o fluxo
+                            await signOut();
+                            window.location.href = '#/auth'; // Forçando navegação via hash
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-danger hover:bg-danger/10 transition-all ${isCollapsed ? 'justify-center px-0' : ''
                             }`}
@@ -394,7 +378,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
     return (
         <div className="min-h-screen w-full bg-background flex">
-            {!isAuthPage && <Sidebar />}
+            {user && !isAuthPage && <Sidebar />}
             <main className="flex-1 flex flex-col pb-20 lg:pb-0 relative overflow-x-hidden">
                 {children}
                 <BottomNav />

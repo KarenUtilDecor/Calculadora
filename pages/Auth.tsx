@@ -73,7 +73,7 @@ const Auth: React.FC = () => {
                     <div className="relative inline-block">
                         <div className="absolute inset-0 bg-primary/40 rounded-3xl blur-2xl animate-pulse"></div>
                         <div className="relative size-20 rounded-3xl bg-gradient-to-br from-primary/30 to-primary/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-glow shadow-primary/30">
-                            <span className="material-symbols-outlined text-4xl text-white drop-shadow-lg">payments</span>
+                            <span className="material-symbols-outlined text-4xl text-white drop-shadow-lg">sell</span>
                         </div>
                     </div>
                     <h1 className="mt-8 text-4xl font-black text-white tracking-tighter sm:text-5xl">
