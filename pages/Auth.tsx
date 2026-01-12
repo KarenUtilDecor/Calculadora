@@ -10,11 +10,14 @@ const Auth: React.FC = () => {
     const [fullName, setFullName] = useState('');
     const [error, setError] = useState<string | null>(null);
     const navigate = useNavigate();
+    const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
+        // ... rest of existing handleSubmit logic ...
+
 
         // Timeout promise
         const timeoutPromise = new Promise((_, reject) => {
@@ -172,6 +175,36 @@ const Auth: React.FC = () => {
                     {isLogin ? 'Esqueceu sua senha?' : 'Ao se cadastrar você aceita nossos termos.'}
                     <button className="text-primary font-bold ml-1 hover:underline">Saiba mais</button>
                 </p>
+
+                <div className="mt-8 flex flex-col items-center gap-2">
+                    <button
+                        onClick={async () => {
+                            setConnectionStatus('Testando...');
+                            const start = performance.now();
+                            try {
+                                const { error } = await supabase.from('profiles').select('count', { count: 'exact', head: true });
+                                const end = performance.now();
+                                const latency = Math.round(end - start);
+                                if (error && error.code !== 'PGRST116') {
+                                    setConnectionStatus(`Erro: ${error.message} (${latency}ms)`);
+                                } else {
+                                    setConnectionStatus(`Conexão Supabase: OK! Latência: ${latency}ms`);
+                                }
+                            } catch (err: any) {
+                                setConnectionStatus(`Erro de rede: ${err.message}`);
+                            }
+                        }}
+                        className="text-xs text-text-sec/50 hover:text-primary transition-colors flex items-center gap-1"
+                    >
+                        <span className="material-symbols-outlined text-[14px]">wifi</span>
+                        Testar Conexão
+                    </button>
+                    {connectionStatus && (
+                        <span className={`text-xs font-bold ${connectionStatus.includes('Erro') ? 'text-danger' : 'text-green-500'}`}>
+                            {connectionStatus}
+                        </span>
+                    )}
+                </div>
             </div>
 
             <style>{`
