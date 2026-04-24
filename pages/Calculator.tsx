@@ -1,10 +1,91 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
 import { Platform, ProductData } from '../types';
 import { getMLShippingCost, getMLFixedFee } from '../lib/mlShipping';
 import { getSheinShippingFee } from '../lib/sheinShipping';
 import { getShopeeCommission, calculateShopeePriceForMargin, calculateShopeePriceForProfit, SHOPEE_BRACKETS } from '../lib/shopeeCommission';
+
+// --- Input components with LOCAL state to prevent parent re-renders during typing ---
+// Typing only re-renders this component. Parent only updates after debounce or blur.
+// This is the key fix for mobile keyboards closing on every keystroke.
+
+const DebouncedInput: React.FC<{
+    value: string;
+    onValueChange: (v: string) => void;
+    type?: 'currency' | 'percent' | 'plain';
+    label: string;
+    icon?: string;
+    placeholder?: string;
+    className?: string;
+    inputClassName?: string;
+}> = ({ value, onValueChange, type = 'plain', label, icon, placeholder, className, inputClassName }) => {
+    const [localValue, setLocalValue] = useState(value);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+    // Sync from parent only when input is NOT focused (e.g. platform change, reset)
+    useEffect(() => {
+        if (document.activeElement !== inputRef.current) {
+            setLocalValue(value);
+        }
+    }, [value]);
+
+    const pushToParent = (v: string) => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => onValueChange(v), 400);
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const v = e.target.value;
+        if (v === '' || v === '-' || /^-?\d*[.,]?\d*$/.test(v)) {
+            setLocalValue(v);
+            pushToParent(v);
+        }
+    };
+
+    const handleBlur = () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        onValueChange(localValue);
+    };
+
+    const isCurrency = type === 'currency';
+    const isPercent = type === 'percent';
+
+    return (
+        <label className={`flex flex-col gap-1 ${className || ''}`}>
+            <span className="text-xs font-medium text-text-sec">{label}</span>
+            <div className="relative">
+                {isCurrency && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-sec font-semibold pointer-events-none text-xs">R$</div>}
+                <input
+                    ref={inputRef}
+                    type="text"
+                    inputMode="decimal"
+                    value={localValue}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={inputClassName || `w-full rounded-lg border border-border bg-input-surface py-2 ${isCurrency ? 'pl-8 pr-3' : isPercent ? 'pl-3 pr-8' : 'pl-3 pr-3'} text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all font-semibold text-sm`}
+                    placeholder={placeholder || (isCurrency ? '0,00' : '0')}
+                />
+                {isPercent && <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-sec font-bold pointer-events-none">%</div>}
+                {icon && <div className="absolute right-2 top-1/2 -translate-y-1/2 text-text-sec pointer-events-none">
+                    <span className="material-symbols-outlined text-sm">{icon}</span>
+                </div>}
+            </div>
+        </label>
+    );
+};
+
+// Convenience wrappers
+const CurrencyInput: React.FC<{ value: string; onChange: (v: string) => void; placeholder?: string; label: string; icon?: string }> =
+    ({ value, onChange, placeholder, label, icon }) => (
+        <DebouncedInput value={value} onValueChange={onChange} type="currency" label={label} icon={icon} placeholder={placeholder} />
+    );
+
+const PercentInput: React.FC<{ value: string; onChange: (v: string) => void; label: string; placeholder?: string }> =
+    ({ value, onChange, label, placeholder }) => (
+        <DebouncedInput value={value} onValueChange={onChange} type="percent" label={label} placeholder={placeholder} />
+    );
 
 const Calculator: React.FC = () => {
     const navigate = useNavigate();
@@ -81,96 +162,105 @@ const Calculator: React.FC = () => {
         incomeTaxValue?: number; bracketLabel?: string;
     } | null>(null);
 
-    React.useEffect(() => {
-        const itv = parseFloat(incomeTaxPercent) || 0;
-        const atv = parseFloat(adTaxPercent) || 0;
-        const dv = parseFloat(discountPercent) || 0;
-        const bv = parseFloat(breakagePercent) || 0;
-        const cv = parseFloat(collabPercent) || 0;
+    // Debounce ref to prevent re-renders from closing mobile keyboard
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-        if (platform === 'shopee') {
-            const otherVar = itv + atv + dv + bv + cv;
-            let price = 0, mc = 0, mcP = 0, cPerc = 0, fFee = 0, bLabel = '';
+    useEffect(() => {
+        // Clear previous timeout — only calculate after user stops typing
+        if (debounceRef.current) clearTimeout(debounceRef.current);
 
-            if (calculationMode === 'price') {
-                price = parseFloat(desiredPrice) || 0;
-                if (price <= 0) { setPreviewResult(null); return; }
-                const sc = getShopeeCommission(price);
-                cPerc = sc.commissionPercent; fFee = sc.fixedFee; bLabel = sc.bracket.label;
-                mc = price - (price * cPerc / 100) - fFee - (price * otherVar / 100) - cmvTotal;
-                mcP = price > 0 ? (mc / price) * 100 : 0;
-            } else if (calculationMode === 'margin') {
-                if (cmvTotal === 0) { setPreviewResult(null); return; }
-                const r = calculateShopeePriceForMargin(cmvTotal, margin, otherVar);
-                if (!r) { setPreviewResult(null); return; }
-                price = r.price;
-                const sc = getShopeeCommission(price);
-                cPerc = sc.commissionPercent; fFee = sc.fixedFee; bLabel = sc.bracket.label;
-                mc = price * margin / 100; mcP = margin;
-            } else {
-                const tmc = parseFloat(targetProfit) || 0;
-                if (tmc <= 0 && cmvTotal === 0) { setPreviewResult(null); return; }
-                const r = calculateShopeePriceForProfit(cmvTotal, tmc, otherVar);
-                if (!r) { setPreviewResult(null); return; }
-                price = r.price;
-                const sc = getShopeeCommission(price);
-                cPerc = sc.commissionPercent; fFee = sc.fixedFee; bLabel = sc.bracket.label;
-                mc = tmc; mcP = price > 0 ? (mc / price) * 100 : 0;
-            }
+        debounceRef.current = setTimeout(() => {
+            const itv = parseFloat(incomeTaxPercent) || 0;
+            const atv = parseFloat(adTaxPercent) || 0;
+            const dv = parseFloat(discountPercent) || 0;
+            const bv = parseFloat(breakagePercent) || 0;
+            const cv = parseFloat(collabPercent) || 0;
 
-            setPreviewResult({
-                price, profit: mc, margin: mcP,
-                commissionPercent: cPerc, commissionValue: price * cPerc / 100,
-                fixedFeeValue: fFee, repasse: price - (price * cPerc / 100) - fFee,
-                incomeTaxValue: price * itv / 100, bracketLabel: bLabel,
-            });
-        } else {
-            const commV = parseFloat(commission) || 0;
-            const ftV = parseFloat(fixedTax) || 0;
-            const shV = parseFloat(shippingCost) || 0;
-            const tpV = parseFloat(targetProfit) || 0;
-            const wV = parseFloat(weight) || 0;
+            if (platform === 'shopee') {
+                const otherVar = itv + atv + dv + bv + cv;
+                let price = 0, mc = 0, mcP = 0, cPerc = 0, fFee = 0, bLabel = '';
 
-            if (cmvTotal === 0 && calculationMode !== 'price') { setPreviewResult(null); return; }
-
-            const totalVarP = commV + atv + dv + itv + bv + cv;
-            const calcPrice = (s: number, ft: number) => {
-                const fc = cmvTotal + s + ft;
-                if (calculationMode === 'margin') { const d = 1 - ((totalVarP + margin) / 100); return d > 0 ? fc / d : 0; }
-                if (calculationMode === 'profit') { const d = 1 - (totalVarP / 100); return d > 0 ? (fc + tpV) / d : 0; }
-                return parseFloat(desiredPrice) || 0;
-            };
-
-            let sp = 0, fs = shV;
-            if (platform === 'ml') {
-                let cp = 0, cft = 0, cs = 0;
-                for (let i = 0; i < 5; i++) {
-                    cft = getMLFixedFee(cp || cmvTotal * 2);
-                    cs = (hasFreeShipping && wV > 0) ? getMLShippingCost(cp || cmvTotal * 2, wV) : shV;
-                    cp = calcPrice(cs, cft);
+                if (calculationMode === 'price') {
+                    price = parseFloat(desiredPrice) || 0;
+                    if (price <= 0) { setPreviewResult(null); return; }
+                    const sc = getShopeeCommission(price);
+                    cPerc = sc.commissionPercent; fFee = sc.fixedFee; bLabel = sc.bracket.label;
+                    mc = price - (price * cPerc / 100) - fFee - (price * otherVar / 100) - cmvTotal;
+                    mcP = price > 0 ? (mc / price) * 100 : 0;
+                } else if (calculationMode === 'margin') {
+                    if (cmvTotal === 0) { setPreviewResult(null); return; }
+                    const r = calculateShopeePriceForMargin(cmvTotal, margin, otherVar);
+                    if (!r) { setPreviewResult(null); return; }
+                    price = r.price;
+                    const sc = getShopeeCommission(price);
+                    cPerc = sc.commissionPercent; fFee = sc.fixedFee; bLabel = sc.bracket.label;
+                    mc = price * margin / 100; mcP = margin;
+                } else {
+                    const tmc = parseFloat(targetProfit) || 0;
+                    if (tmc <= 0 && cmvTotal === 0) { setPreviewResult(null); return; }
+                    const r = calculateShopeePriceForProfit(cmvTotal, tmc, otherVar);
+                    if (!r) { setPreviewResult(null); return; }
+                    price = r.price;
+                    const sc = getShopeeCommission(price);
+                    cPerc = sc.commissionPercent; fFee = sc.fixedFee; bLabel = sc.bracket.label;
+                    mc = tmc; mcP = price > 0 ? (mc / price) * 100 : 0;
                 }
-                sp = cp; fs = cs;
+
+                setPreviewResult({
+                    price, profit: mc, margin: mcP,
+                    commissionPercent: cPerc, commissionValue: price * cPerc / 100,
+                    fixedFeeValue: fFee, repasse: price - (price * cPerc / 100) - fFee,
+                    incomeTaxValue: price * itv / 100, bracketLabel: bLabel,
+                });
             } else {
-                sp = calcPrice(shV, ftV);
+                const commV = parseFloat(commission) || 0;
+                const ftV = parseFloat(fixedTax) || 0;
+                const shV = parseFloat(shippingCost) || 0;
+                const tpV = parseFloat(targetProfit) || 0;
+                const wV = parseFloat(weight) || 0;
+
+                if (cmvTotal === 0 && calculationMode !== 'price') { setPreviewResult(null); return; }
+
+                const totalVarP = commV + atv + dv + itv + bv + cv;
+                const calcPrice = (s: number, ft: number) => {
+                    const fc = cmvTotal + s + ft;
+                    if (calculationMode === 'margin') { const d = 1 - ((totalVarP + margin) / 100); return d > 0 ? fc / d : 0; }
+                    if (calculationMode === 'profit') { const d = 1 - (totalVarP / 100); return d > 0 ? (fc + tpV) / d : 0; }
+                    return parseFloat(desiredPrice) || 0;
+                };
+
+                let sp = 0, fs = shV;
+                if (platform === 'ml') {
+                    let cp = 0, cft = 0, cs = 0;
+                    for (let i = 0; i < 5; i++) {
+                        cft = getMLFixedFee(cp || cmvTotal * 2);
+                        cs = (hasFreeShipping && wV > 0) ? getMLShippingCost(cp || cmvTotal * 2, wV) : shV;
+                        cp = calcPrice(cs, cft);
+                    }
+                    sp = cp; fs = cs;
+                } else {
+                    sp = calcPrice(shV, ftV);
+                }
+
+                const eft = platform === 'ml' ? getMLFixedFee(sp) : ftV;
+                const ffc = cmvTotal + fs + eft;
+                const profit = sp - ffc - (sp * (totalVarP / 100));
+                const am = sp > 0 ? (profit / sp) * 100 : margin;
+
+                // Update ML fixedTax inline (avoids a separate cascading useEffect)
+                if (platform === 'ml') {
+                    const cf = getMLFixedFee(sp);
+                    if (Math.abs(parseFloat(fixedTax || '0') - cf) > 0.01) setFixedTax(cf.toFixed(2));
+                }
+
+                setPreviewResult({ price: sp, profit, margin: am });
             }
+        }, 300); // 300ms debounce
 
-            const eft = platform === 'ml' ? getMLFixedFee(sp) : ftV;
-            const ffc = cmvTotal + fs + eft;
-            const profit = sp - ffc - (sp * (totalVarP / 100));
-            const am = sp > 0 ? (profit / sp) * 100 : margin;
-
-            setPreviewResult({ price: sp, profit, margin: am });
-        }
+        return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
     }, [cmvTotal, commission, fixedTax, shippingCost, adTaxPercent, discountPercent,
         incomeTaxPercent, breakagePercent, collabPercent, targetProfit, weight, margin,
         calculationMode, desiredPrice, platform, hasFreeShipping, mlListingType]);
-
-    React.useEffect(() => {
-        if (platform === 'ml' && previewResult) {
-            const cf = getMLFixedFee(previewResult.price);
-            if (Math.abs(parseFloat(fixedTax || '0') - cf) > 0.01) setFixedTax(cf.toFixed(2));
-        }
-    }, [previewResult, platform]);
 
     const handleCalculate = () => {
         if (!previewResult) return;
@@ -209,35 +299,7 @@ const Calculator: React.FC = () => {
         navigate('/results');
     };
 
-    // Input helper
-    const CurrencyInput: React.FC<{ value: string; onChange: (v: string) => void; placeholder?: string; label: string; icon?: string }> =
-        ({ value, onChange, placeholder = '0,00', label, icon }) => (
-            <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-text-sec">{label}</span>
-                <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-sec font-semibold pointer-events-none text-xs">R$</div>
-                    <input type="number" value={value} onChange={(e) => onChange(e.target.value)}
-                        className="w-full rounded-lg border border-border bg-input-surface py-2 pl-8 pr-3 text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all font-semibold text-sm"
-                        placeholder={placeholder} />
-                    {icon && <div className="absolute right-2 top-1/2 -translate-y-1/2 text-text-sec pointer-events-none">
-                        <span className="material-symbols-outlined text-sm">{icon}</span>
-                    </div>}
-                </div>
-            </label>
-        );
-
-    const PercentInput: React.FC<{ value: string; onChange: (v: string) => void; label: string; placeholder?: string }> =
-        ({ value, onChange, label, placeholder = '0' }) => (
-            <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-text-sec">{label}</span>
-                <div className="relative">
-                    <input type="number" value={value} onChange={(e) => onChange(e.target.value)}
-                        className="w-full rounded-lg border border-border bg-input-surface py-2 pl-3 pr-8 text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all font-semibold text-sm"
-                        placeholder={placeholder} />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-sec font-bold pointer-events-none">%</div>
-                </div>
-            </label>
-        );
+    // CurrencyInput and PercentInput are now defined outside the component (above)
 
     return (
         <div className="w-full max-w-7xl mx-auto px-2 py-2 lg:px-4 lg:pt-2 flex flex-col gap-2">
@@ -277,28 +339,10 @@ const Calculator: React.FC = () => {
                             Detalhes do Produto
                         </h3>
                         <div className="bg-surface p-3 rounded-xl border border-border grid gap-2">
-                            <label className="flex flex-col gap-2">
-                                <span className="text-sm font-medium text-text-sec">Nome do Produto</span>
-                                <div className="relative">
-                                    <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-                                        className="w-full rounded-lg border border-border bg-input-surface py-2 pl-3 pr-8 text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
-                                        placeholder="Ex: Fone Bluetooth Pro..." />
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none">
-                                        <span className="material-symbols-outlined text-base">auto_fix_high</span>
-                                    </div>
-                                </div>
-                            </label>
-                            <label className="flex flex-col gap-2">
-                                <span className="text-sm font-medium text-text-sec">Código SKU</span>
-                                <div className="relative">
-                                    <input type="text" value={sku} onChange={(e) => setSku(e.target.value)}
-                                        className="w-full rounded-lg border border-border bg-input-surface py-2 pl-3 pr-8 text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
-                                        placeholder="Ex: SKU-001" />
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-sec pointer-events-none">
-                                        <span className="material-symbols-outlined text-base">qr_code_2</span>
-                                    </div>
-                                </div>
-                            </label>
+                            <DebouncedInput value={name} onValueChange={setName} label="Nome do Produto" icon="auto_fix_high" placeholder="Ex: Fone Bluetooth Pro..."
+                                inputClassName="w-full rounded-lg border border-border bg-input-surface py-2 pl-3 pr-8 text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm" />
+                            <DebouncedInput value={sku} onValueChange={setSku} label="Código SKU" icon="qr_code_2" placeholder="Ex: SKU-001"
+                                inputClassName="w-full rounded-lg border border-border bg-input-surface py-2 pl-3 pr-8 text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm" />
                         </div>
                     </section>
 
@@ -358,9 +402,8 @@ const Calculator: React.FC = () => {
                                         <span className="text-sm font-medium text-text-sec">Peso do Produto (gramas)</span>
                                         <div className="relative">
                                             <div className="absolute right-4 top-1/2 -translate-y-1/2 text-text-sec font-semibold pointer-events-none">g</div>
-                                            <input type="number" value={weight} onChange={(e) => setWeight(e.target.value)}
-                                                className="w-full rounded-xl border border-border bg-input-surface py-3 pl-4 pr-12 text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all font-semibold"
-                                                placeholder="Ex: 500" />
+                                            <DebouncedInput value={weight} onValueChange={setWeight} label="" placeholder="Ex: 500"
+                                                inputClassName="w-full rounded-xl border border-border bg-input-surface py-3 pl-4 pr-12 text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all font-semibold" />
                                         </div>
                                     </label>
                                 )}
@@ -377,16 +420,12 @@ const Calculator: React.FC = () => {
                                     <h3>Dimensões da Embalagem (cm)</h3>
                                 </div>
                                 <div className="grid grid-cols-3 gap-2">
-                                    {[{ l: 'Altura', v: sheinHeight, s: setSheinHeight },
-                                    { l: 'Largura', v: sheinWidth, s: setSheinWidth },
-                                    { l: 'Comprimento', v: sheinLength, s: setSheinLength }].map((d) => (
-                                        <label key={d.l} className="flex flex-col gap-1">
-                                            <span className="text-xs text-text-sec">{d.l}</span>
-                                            <input type="number" value={d.v}
-                                                onChange={(e) => { d.s(e.target.value); recalcSheinFee(d.l === 'Altura' ? e.target.value : sheinHeight, d.l === 'Largura' ? e.target.value : sheinWidth, d.l === 'Comprimento' ? e.target.value : sheinLength); }}
-                                                className="w-full rounded-lg border border-border bg-input-surface p-2 text-center text-white focus:border-brand-shein outline-none" placeholder="0" />
-                                        </label>
-                                    ))}
+                                    <DebouncedInput value={sheinHeight} onValueChange={(v) => { setSheinHeight(v); recalcSheinFee(v, sheinWidth, sheinLength); }} label="Altura" placeholder="0"
+                                        inputClassName="w-full rounded-lg border border-border bg-input-surface p-2 text-center text-white focus:border-brand-shein outline-none" />
+                                    <DebouncedInput value={sheinWidth} onValueChange={(v) => { setSheinWidth(v); recalcSheinFee(sheinHeight, v, sheinLength); }} label="Largura" placeholder="0"
+                                        inputClassName="w-full rounded-lg border border-border bg-input-surface p-2 text-center text-white focus:border-brand-shein outline-none" />
+                                    <DebouncedInput value={sheinLength} onValueChange={(v) => { setSheinLength(v); recalcSheinFee(sheinHeight, sheinWidth, v); }} label="Comprimento" placeholder="0"
+                                        inputClassName="w-full rounded-lg border border-border bg-input-surface p-2 text-center text-white focus:border-brand-shein outline-none" />
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-text-sec pt-2 border-t border-border/50">
                                     <span>Peso Cubado: {((parseFloat(sheinHeight) || 0) * (parseFloat(sheinWidth) || 0) * (parseFloat(sheinLength) || 0) / 6000).toFixed(4)} kg</span>
@@ -482,10 +521,8 @@ const Calculator: React.FC = () => {
                                         <span className="text-[10px] font-bold text-secondary bg-secondary/20 px-1 py-0.5 rounded">Cálculo Reverso</span>
                                     </div>
                                     <div className="relative flex items-center">
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-sec font-semibold pointer-events-none">R$</div>
-                                        <input type="number" value={desiredPrice} onChange={(e) => setDesiredPrice(e.target.value)}
-                                            className="w-full rounded-lg border border-border bg-input-surface py-2 pl-9 pr-3 text-base font-bold text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                            placeholder="199,00" />
+                                    <DebouncedInput value={desiredPrice} onValueChange={setDesiredPrice} type="currency" label="" placeholder="199,00"
+                                        inputClassName="w-full rounded-lg border border-border bg-input-surface py-2 pl-9 pr-3 text-base font-bold text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" />
                                     </div>
                                     <p className="text-[10px] text-text-sec mt-0.5">
                                         {platform === 'shopee' ? 'Descubra a MC e MC% a partir do preço desejado' : 'Descubra o lucro e a margem a partir do preço'}
@@ -498,10 +535,8 @@ const Calculator: React.FC = () => {
                                         <span className="text-[10px] font-bold text-primary bg-primary/20 px-1 py-0.5 rounded">15-25%</span>
                                     </div>
                                     <div className="relative flex items-center mb-1">
-                                        <input type="number" value={margin} onChange={(e) => setMargin(Number(e.target.value))}
-                                            className="w-full rounded-lg border border-border bg-input-surface py-2 pl-3 pr-8 text-base font-bold text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                            placeholder="20" />
-                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-sec font-bold pointer-events-none">%</div>
+                                        <DebouncedInput value={String(margin)} onValueChange={(v) => setMargin(Number(v) || 0)} type="percent" label="" placeholder="20"
+                                            inputClassName="w-full rounded-lg border border-border bg-input-surface py-2 pl-3 pr-8 text-base font-bold text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" />
                                     </div>
                                     <input type="range" min="0" max="100" value={margin} onChange={(e) => setMargin(Number(e.target.value))}
                                         className="w-full h-1.5 bg-border rounded-lg appearance-none cursor-pointer accent-primary" />
@@ -513,10 +548,8 @@ const Calculator: React.FC = () => {
                                         <span className="text-[10px] font-bold text-success bg-success/20 px-1 py-0.5 rounded">Valor Fixo</span>
                                     </div>
                                     <div className="relative flex items-center">
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-sec font-semibold pointer-events-none">R$</div>
-                                        <input type="number" value={targetProfit} onChange={(e) => setTargetProfit(e.target.value)}
-                                            className="w-full rounded-lg border border-border bg-input-surface py-2 pl-9 pr-3 text-base font-bold text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                            placeholder="50,00" />
+                                    <DebouncedInput value={targetProfit} onValueChange={setTargetProfit} type="currency" label="" placeholder="50,00"
+                                        inputClassName="w-full rounded-lg border border-border bg-input-surface py-2 pl-9 pr-3 text-base font-bold text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" />
                                     </div>
                                     <p className="text-[10px] text-text-sec mt-0.5">
                                         {platform === 'shopee' ? 'Defina a Margem de Contribuição desejada por unidade' : 'Defina quanto quer lucrar por unidade vendida'}
@@ -526,9 +559,9 @@ const Calculator: React.FC = () => {
                         </div>
                     </section>
 
-                    {/* Preview */}
-                    {previewResult && (
-                        <div className="mt-2 rounded-xl p-3 border bg-surface border-border">
+                    {/* Preview — always in DOM to prevent layout shifts that close mobile keyboard */}
+                    <div className={`mt-2 rounded-xl p-3 border bg-surface border-border transition-all duration-200 ${previewResult ? 'opacity-100' : 'opacity-0 pointer-events-none h-0 p-0 m-0 border-0 overflow-hidden'}`}>
+                        {previewResult && (<>
                             <div className="flex justify-between items-center mb-1">
                                 <span className="text-xs text-text-sec">Preço de Venda</span>
                                 <span className="text-xs text-text-sec">{platform === 'shopee' ? 'Margem de Contribuição' : 'Lucro Estimado'}</span>
@@ -577,8 +610,8 @@ const Calculator: React.FC = () => {
                                     </div>
                                 </div>
                             )}
-                        </div>
-                    )}
+                        </>)}
+                    </div>
 
                     <button onClick={handleCalculate} disabled={!previewResult}
                         className="w-full bg-primary hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-white text-base font-bold py-3 rounded-xl shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 active:scale-[0.98] flex items-center justify-center gap-2 mt-2">

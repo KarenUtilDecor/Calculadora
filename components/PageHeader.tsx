@@ -77,7 +77,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                 <div className="size-10" />
             )}
 
-            <div className="flex-1" />
+            <h2 className="flex-1 text-center text-lg font-bold text-white truncate">{title}</h2>
 
             {rightAction ? (
                 <button

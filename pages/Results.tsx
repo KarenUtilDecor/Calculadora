@@ -295,7 +295,7 @@ const Results: React.FC = () => {
             </main>
 
             {/* Bottom Actions */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 pb-20 bg-background/90 backdrop-blur-xl border-t border-border z-40 lg:static lg:bg-transparent lg:border-none lg:p-0 lg:mt-8">
+            <div className="fixed bottom-0 left-0 right-0 p-4 pb-28 bg-background/90 backdrop-blur-xl border-t border-border z-40 lg:static lg:bg-transparent lg:border-none lg:p-0 lg:pb-0 lg:mt-8">
                 <div className="max-w-md lg:max-w-4xl mx-auto flex items-center justify-center gap-3 w-full">
                     <button onClick={handleSave}
                         className="bg-surface-card hover:bg-white/10 text-white text-sm font-bold py-4 px-6 rounded-xl border border-border transition-all active:scale-[0.98] flex items-center justify-center gap-2 group min-w-[140px]">
@@ -336,7 +336,7 @@ const Results: React.FC = () => {
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                     <span className="text-text-sec font-medium">%</span>
                                 </div>
-                                <input type="number" value={spikeTax} onChange={(e) => setSpikeTax(Number(e.target.value))}
+                                <input type="text" inputMode="decimal" value={spikeTax} onChange={(e) => { const v = e.target.value; if (v === '' || /^\d*[.,]?\d*$/.test(v)) setSpikeTax(Number(v) || 0); }}
                                     className="block w-full pl-10 pr-12 py-4 bg-background border border-border rounded-xl text-white placeholder-white/20 focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-lg font-bold text-center"
                                     placeholder="Ex: 20" />
                                 <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">

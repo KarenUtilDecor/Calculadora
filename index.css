@@ -57,3 +57,26 @@ a,
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+
+/* Hide number input spinners — they cause touch misclicks and keyboard issues on mobile */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  /* Prevent iOS auto-zoom on input focus (combined with font-size: 16px rule above) */
+  appearance: textfield;
+}
+
+/* Prevent content shift when mobile keyboard opens */
+html, body {
+  scroll-behavior: smooth;
+}
+
+/* Ensure inputs don't trigger viewport changes on focus */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+}

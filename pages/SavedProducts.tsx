@@ -8,8 +8,14 @@ const SavedProducts: React.FC = () => {
     const navigate = useNavigate();
     const { savedResults, deleteResult, setCurrentResult } = useApp();
     const [filter, setFilter] = useState<'all' | 'ml' | 'shopee' | 'shein'>('all');
+    const [searchQuery, setSearchQuery] = useState('');
 
-    const filtered = savedResults.filter(r => filter === 'all' || r.product.platform === filter);
+    const filtered = savedResults.filter(r => {
+        const matchesPlatform = filter === 'all' || r.product.platform === filter;
+        const query = searchQuery.toLowerCase().trim();
+        const matchesSearch = !query || r.product.name.toLowerCase().includes(query) || r.product.sku.toLowerCase().includes(query);
+        return matchesPlatform && matchesSearch;
+    });
 
     const handleEdit = (result: CalculationResult) => {
         setCurrentResult(result);
@@ -32,6 +38,8 @@ const SavedProducts: React.FC = () => {
                             className="w-full pl-10 pr-4 py-3.5 rounded-xl bg-surface border border-border shadow-sm focus:ring-2 focus:ring-primary/50 focus:border-primary text-sm text-white placeholder-text-sec outline-none transition-all"
                             placeholder="Buscar por nome ou SKU..."
                             type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
                     <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
