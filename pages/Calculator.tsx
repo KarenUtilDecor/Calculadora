@@ -38,7 +38,8 @@ const DebouncedInput: React.FC<{
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const v = e.target.value;
-        if (v === '' || v === '-' || /^-?\d*[.,]?\d*$/.test(v)) {
+        // Only apply numeric validation for currency/percent inputs
+        if (type === 'plain' || v === '' || v === '-' || /^-?\d*[.,]?\d*$/.test(v)) {
             setLocalValue(v);
             pushToParent(v);
         }
