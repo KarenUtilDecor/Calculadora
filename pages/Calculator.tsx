@@ -6,6 +6,12 @@ import { getMLShippingCost, getMLFixedFee } from '../lib/mlShipping';
 import { getSheinShippingFee } from '../lib/sheinShipping';
 import { getShopeeCommission, calculateShopeePriceForMargin, calculateShopeePriceForProfit, SHOPEE_BRACKETS } from '../lib/shopeeCommission';
 
+
+const parseBrFloat = (val: string | number | undefined): number => {
+    if (val === undefined || val === null || val === '') return 0;
+    return parseFloat(String(val).replace(/,/g, '.')) || 0;
+};
+
 // --- Input components with LOCAL state to prevent parent re-renders during typing ---
 // Typing only re-renders this component. Parent only updates after debounce or blur.
 // This is the key fix for mobile keyboards closing on every keystroke.
@@ -104,9 +110,9 @@ const Calculator: React.FC = () => {
     const [printingCost, setPrintingCost] = useState('');
 
     const cmvTotal = useMemo(() => {
-        return (parseFloat(productCost) || 0) + (parseFloat(purchaseTax) || 0) +
-            (parseFloat(purchaseShipping) || 0) + (parseFloat(packagingCost) || 0) +
-            (parseFloat(printingCost) || 0);
+        return (parseBrFloat(productCost) || 0) + (parseBrFloat(purchaseTax) || 0) +
+            (parseBrFloat(purchaseShipping) || 0) + (parseBrFloat(packagingCost) || 0) +
+            (parseBrFloat(printingCost) || 0);
     }, [productCost, purchaseTax, purchaseShipping, packagingCost, printingCost]);
 
     // Platform-specific (non-Shopee)
@@ -150,7 +156,7 @@ const Calculator: React.FC = () => {
     };
 
     const recalcSheinFee = (h: string, w: string, l: string) => {
-        const hv = parseFloat(h) || 0, wv = parseFloat(w) || 0, lv = parseFloat(l) || 0;
+        const hv = parseBrFloat(h) || 0, wv = parseBrFloat(w) || 0, lv = parseBrFloat(l) || 0;
         if (hv > 0 && wv > 0 && lv > 0) setFixedTax(getSheinShippingFee(hv, wv, lv).toFixed(2));
         else setFixedTax('0');
     };
@@ -171,18 +177,18 @@ const Calculator: React.FC = () => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
 
         debounceRef.current = setTimeout(() => {
-            const itv = parseFloat(incomeTaxPercent) || 0;
-            const atv = parseFloat(adTaxPercent) || 0;
-            const dv = parseFloat(discountPercent) || 0;
-            const bv = parseFloat(breakagePercent) || 0;
-            const cv = parseFloat(collabPercent) || 0;
+            const itv = parseBrFloat(incomeTaxPercent) || 0;
+            const atv = parseBrFloat(adTaxPercent) || 0;
+            const dv = parseBrFloat(discountPercent) || 0;
+            const bv = parseBrFloat(breakagePercent) || 0;
+            const cv = parseBrFloat(collabPercent) || 0;
 
             if (platform === 'shopee') {
                 const otherVar = itv + atv + dv + bv + cv;
                 let price = 0, mc = 0, mcP = 0, cPerc = 0, fFee = 0, bLabel = '';
 
                 if (calculationMode === 'price') {
-                    price = parseFloat(desiredPrice) || 0;
+                    price = parseBrFloat(desiredPrice) || 0;
                     if (price <= 0) { setPreviewResult(null); return; }
                     const sc = getShopeeCommission(price);
                     cPerc = sc.commissionPercent; fFee = sc.fixedFee; bLabel = sc.bracket.label;
@@ -197,7 +203,7 @@ const Calculator: React.FC = () => {
                     cPerc = sc.commissionPercent; fFee = sc.fixedFee; bLabel = sc.bracket.label;
                     mc = price * margin / 100; mcP = margin;
                 } else {
-                    const tmc = parseFloat(targetProfit) || 0;
+                    const tmc = parseBrFloat(targetProfit) || 0;
                     if (tmc <= 0 && cmvTotal === 0) { setPreviewResult(null); return; }
                     const r = calculateShopeePriceForProfit(cmvTotal, tmc, otherVar);
                     if (!r) { setPreviewResult(null); return; }
@@ -214,11 +220,11 @@ const Calculator: React.FC = () => {
                     incomeTaxValue: price * itv / 100, bracketLabel: bLabel,
                 });
             } else {
-                const commV = parseFloat(commission) || 0;
-                const ftV = parseFloat(fixedTax) || 0;
-                const shV = parseFloat(shippingCost) || 0;
-                const tpV = parseFloat(targetProfit) || 0;
-                const wV = parseFloat(weight) || 0;
+                const commV = parseBrFloat(commission) || 0;
+                const ftV = parseBrFloat(fixedTax) || 0;
+                const shV = parseBrFloat(shippingCost) || 0;
+                const tpV = parseBrFloat(targetProfit) || 0;
+                const wV = parseBrFloat(weight) || 0;
 
                 if (cmvTotal === 0 && calculationMode !== 'price') { setPreviewResult(null); return; }
 
@@ -227,7 +233,7 @@ const Calculator: React.FC = () => {
                     const fc = cmvTotal + s + ft;
                     if (calculationMode === 'margin') { const d = 1 - ((totalVarP + margin) / 100); return d > 0 ? fc / d : 0; }
                     if (calculationMode === 'profit') { const d = 1 - (totalVarP / 100); return d > 0 ? (fc + tpV) / d : 0; }
-                    return parseFloat(desiredPrice) || 0;
+                    return parseBrFloat(desiredPrice) || 0;
                 };
 
                 let sp = 0, fs = shV;
@@ -251,7 +257,7 @@ const Calculator: React.FC = () => {
                 // Update ML fixedTax inline (avoids a separate cascading useEffect)
                 if (platform === 'ml') {
                     const cf = getMLFixedFee(sp);
-                    if (Math.abs(parseFloat(fixedTax || '0') - cf) > 0.01) setFixedTax(cf.toFixed(2));
+                    if (Math.abs(parseBrFloat(fixedTax || '0') - cf) > 0.01) setFixedTax(cf.toFixed(2));
                 }
 
                 setPreviewResult({ price: sp, profit, margin: am });
@@ -265,29 +271,29 @@ const Calculator: React.FC = () => {
 
     const handleCalculate = () => {
         if (!previewResult) return;
-        const commV = platform === 'shopee' ? (previewResult.commissionPercent || 0) : (parseFloat(commission) || 0);
-        const ftV = platform === 'shopee' ? (previewResult.fixedFeeValue || 0) : (parseFloat(fixedTax) || 0);
-        const shV = platform === 'shopee' ? 0 : (parseFloat(shippingCost) || 0);
-        const atv = parseFloat(adTaxPercent) || 0;
-        const dv = parseFloat(discountPercent) || 0;
-        const itv = parseFloat(incomeTaxPercent) || 0;
-        const bv = parseFloat(breakagePercent) || 0;
-        const cv = parseFloat(collabPercent) || 0;
+        const commV = platform === 'shopee' ? (previewResult.commissionPercent || 0) : (parseBrFloat(commission) || 0);
+        const ftV = platform === 'shopee' ? (previewResult.fixedFeeValue || 0) : (parseBrFloat(fixedTax) || 0);
+        const shV = platform === 'shopee' ? 0 : (parseBrFloat(shippingCost) || 0);
+        const atv = parseBrFloat(adTaxPercent) || 0;
+        const dv = parseBrFloat(discountPercent) || 0;
+        const itv = parseBrFloat(incomeTaxPercent) || 0;
+        const bv = parseBrFloat(breakagePercent) || 0;
+        const cv = parseBrFloat(collabPercent) || 0;
         const totalVP = commV + atv + dv + itv + bv + cv;
         const totalTaxes = (previewResult.price * (totalVP / 100)) + ftV;
 
         const product: ProductData = {
             id: Date.now().toString(), name: name || 'Produto Sem Nome', sku: sku || 'N/A',
-            productCost: parseFloat(productCost) || 0, purchaseTax: parseFloat(purchaseTax) || 0,
-            purchaseShipping: parseFloat(purchaseShipping) || 0, packagingCost: parseFloat(packagingCost) || 0,
-            printingCost: parseFloat(printingCost) || 0, cmvTotal,
+            productCost: parseBrFloat(productCost) || 0, purchaseTax: parseBrFloat(purchaseTax) || 0,
+            purchaseShipping: parseBrFloat(purchaseShipping) || 0, packagingCost: parseBrFloat(packagingCost) || 0,
+            printingCost: parseBrFloat(printingCost) || 0, cmvTotal,
             cost: cmvTotal, fixedCost: 0, shippingCost: shV,
             adTaxPercent: atv, discountPercent: dv, taxPercent: commV, taxFixed: ftV,
             incomeTaxPercent: itv, breakagePercent: bv, collabPercent: cv,
             marginTarget: previewResult.margin, targetProfit: previewResult.profit,
-            targetPrice: parseFloat(desiredPrice) || 0, calculationMode, platform,
+            targetPrice: parseBrFloat(desiredPrice) || 0, calculationMode, platform,
             hasFreeShipping: platform === 'ml' ? hasFreeShipping : false,
-            weight: parseFloat(weight) || 0,
+            weight: parseBrFloat(weight) || 0,
         };
 
         setCurrentProduct(product);
@@ -429,7 +435,7 @@ const Calculator: React.FC = () => {
                                         inputClassName="w-full rounded-lg border border-border bg-input-surface p-2 text-center text-white focus:border-brand-shein outline-none" />
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-text-sec pt-2 border-t border-border/50">
-                                    <span>Peso Cubado: {((parseFloat(sheinHeight) || 0) * (parseFloat(sheinWidth) || 0) * (parseFloat(sheinLength) || 0) / 6000).toFixed(4)} kg</span>
+                                    <span>Peso Cubado: {((parseBrFloat(sheinHeight) || 0) * (parseBrFloat(sheinWidth) || 0) * (parseBrFloat(sheinLength) || 0) / 6000).toFixed(4)} kg</span>
                                     <span className="font-bold text-brand-shein">Intervenção: R$ {fixedTax}</span>
                                 </div>
                             </div>
