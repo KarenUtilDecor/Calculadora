@@ -2,15 +2,9 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
 import { Platform, ProductData } from '../types';
-import { getMLShippingCost, getMLFixedFee } from '../lib/mlShipping';
+import { getMLShippingCost, getMLFreeShippingFastCost, getEffectiveWeight, calculateMLCubicWeight } from '../lib/mlShipping';
 import { getSheinShippingFee } from '../lib/sheinShipping';
 import { getShopeeCommission, calculateShopeePriceForMargin, calculateShopeePriceForProfit, SHOPEE_BRACKETS } from '../lib/shopeeCommission';
-
-
-const parseBrFloat = (val: string | number | undefined): number => {
-    if (val === undefined || val === null || val === '') return 0;
-    return parseFloat(String(val).replace(/,/g, '.')) || 0;
-};
 
 // --- Input components with LOCAL state to prevent parent re-renders during typing ---
 // Typing only re-renders this component. Parent only updates after debounce or blur.
@@ -44,8 +38,7 @@ const DebouncedInput: React.FC<{
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const v = e.target.value;
-        // Only apply numeric validation for currency/percent inputs
-        if (type === 'plain' || v === '' || v === '-' || /^-?\d*[.,]?\d*$/.test(v)) {
+        if (v === '' || v === '-' || /^-?\d*[.,]?\d*$/.test(v)) {
             setLocalValue(v);
             pushToParent(v);
         }
@@ -110,9 +103,9 @@ const Calculator: React.FC = () => {
     const [printingCost, setPrintingCost] = useState('');
 
     const cmvTotal = useMemo(() => {
-        return (parseBrFloat(productCost) || 0) + (parseBrFloat(purchaseTax) || 0) +
-            (parseBrFloat(purchaseShipping) || 0) + (parseBrFloat(packagingCost) || 0) +
-            (parseBrFloat(printingCost) || 0);
+        return (parseFloat(productCost) || 0) + (parseFloat(purchaseTax) || 0) +
+            (parseFloat(purchaseShipping) || 0) + (parseFloat(packagingCost) || 0) +
+            (parseFloat(printingCost) || 0);
     }, [productCost, purchaseTax, purchaseShipping, packagingCost, printingCost]);
 
     // Platform-specific (non-Shopee)
@@ -137,11 +130,35 @@ const Calculator: React.FC = () => {
     const [hasFreeShipping, setHasFreeShipping] = useState(false);
     const [weight, setWeight] = useState('');
     const [mlListingType, setMlListingType] = useState<'classic' | 'premium'>('classic');
+    const [mlHeight, setMlHeight] = useState('');
+    const [mlWidth, setMlWidth] = useState('');
+    const [mlLength, setMlLength] = useState('');
+    const [mlReputationDiscount, setMlReputationDiscount] = useState<number>(0);
+    const [mlComputedShipping, setMlComputedShipping] = useState<number>(0);
 
     // Shein specific
     const [sheinHeight, setSheinHeight] = useState('');
     const [sheinWidth, setSheinWidth] = useState('');
     const [sheinLength, setSheinLength] = useState('');
+
+    // Compute ML effective weight (max of real weight and cubic weight)
+    const mlEffectiveWeight = useMemo(() => {
+        const realW = parseFloat(weight) || 0;
+        const h = parseFloat(mlHeight) || 0;
+        const w = parseFloat(mlWidth) || 0;
+        const l = parseFloat(mlLength) || 0;
+        if (h > 0 && w > 0 && l > 0) {
+            return getEffectiveWeight(realW, h, w, l);
+        }
+        return realW;
+    }, [weight, mlHeight, mlWidth, mlLength]);
+
+    const mlCubicWeight = useMemo(() => {
+        const h = parseFloat(mlHeight) || 0;
+        const w = parseFloat(mlWidth) || 0;
+        const l = parseFloat(mlLength) || 0;
+        return calculateMLCubicWeight(h, w, l);
+    }, [mlHeight, mlWidth, mlLength]);
 
     const handlePlatformChange = (p: Platform) => {
         setPlatform(p);
@@ -156,7 +173,7 @@ const Calculator: React.FC = () => {
     };
 
     const recalcSheinFee = (h: string, w: string, l: string) => {
-        const hv = parseBrFloat(h) || 0, wv = parseBrFloat(w) || 0, lv = parseBrFloat(l) || 0;
+        const hv = parseFloat(h) || 0, wv = parseFloat(w) || 0, lv = parseFloat(l) || 0;
         if (hv > 0 && wv > 0 && lv > 0) setFixedTax(getSheinShippingFee(hv, wv, lv).toFixed(2));
         else setFixedTax('0');
     };
@@ -177,18 +194,18 @@ const Calculator: React.FC = () => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
 
         debounceRef.current = setTimeout(() => {
-            const itv = parseBrFloat(incomeTaxPercent) || 0;
-            const atv = parseBrFloat(adTaxPercent) || 0;
-            const dv = parseBrFloat(discountPercent) || 0;
-            const bv = parseBrFloat(breakagePercent) || 0;
-            const cv = parseBrFloat(collabPercent) || 0;
+            const itv = parseFloat(incomeTaxPercent) || 0;
+            const atv = parseFloat(adTaxPercent) || 0;
+            const dv = parseFloat(discountPercent) || 0;
+            const bv = parseFloat(breakagePercent) || 0;
+            const cv = parseFloat(collabPercent) || 0;
 
             if (platform === 'shopee') {
                 const otherVar = itv + atv + dv + bv + cv;
                 let price = 0, mc = 0, mcP = 0, cPerc = 0, fFee = 0, bLabel = '';
 
                 if (calculationMode === 'price') {
-                    price = parseBrFloat(desiredPrice) || 0;
+                    price = parseFloat(desiredPrice) || 0;
                     if (price <= 0) { setPreviewResult(null); return; }
                     const sc = getShopeeCommission(price);
                     cPerc = sc.commissionPercent; fFee = sc.fixedFee; bLabel = sc.bracket.label;
@@ -203,7 +220,7 @@ const Calculator: React.FC = () => {
                     cPerc = sc.commissionPercent; fFee = sc.fixedFee; bLabel = sc.bracket.label;
                     mc = price * margin / 100; mcP = margin;
                 } else {
-                    const tmc = parseBrFloat(targetProfit) || 0;
+                    const tmc = parseFloat(targetProfit) || 0;
                     if (tmc <= 0 && cmvTotal === 0) { setPreviewResult(null); return; }
                     const r = calculateShopeePriceForProfit(cmvTotal, tmc, otherVar);
                     if (!r) { setPreviewResult(null); return; }
@@ -220,80 +237,104 @@ const Calculator: React.FC = () => {
                     incomeTaxValue: price * itv / 100, bracketLabel: bLabel,
                 });
             } else {
-                const commV = parseBrFloat(commission) || 0;
-                const ftV = parseBrFloat(fixedTax) || 0;
-                const shV = parseBrFloat(shippingCost) || 0;
-                const tpV = parseBrFloat(targetProfit) || 0;
-                const wV = parseBrFloat(weight) || 0;
+                const commV = parseFloat(commission) || 0;
+                const ftV = parseFloat(fixedTax) || 0;
+                const shV = parseFloat(shippingCost) || 0;
+                const tpV = parseFloat(targetProfit) || 0;
 
                 if (cmvTotal === 0 && calculationMode !== 'price') { setPreviewResult(null); return; }
 
                 const totalVarP = commV + atv + dv + itv + bv + cv;
-                const calcPrice = (s: number, ft: number) => {
-                    const fc = cmvTotal + s + ft;
-                    if (calculationMode === 'margin') { const d = 1 - ((totalVarP + margin) / 100); return d > 0 ? fc / d : 0; }
-                    if (calculationMode === 'profit') { const d = 1 - (totalVarP / 100); return d > 0 ? (fc + tpV) / d : 0; }
-                    return parseBrFloat(desiredPrice) || 0;
-                };
 
-                let sp = 0, fs = shV;
                 if (platform === 'ml') {
-                    let cp = 0, cft = 0, cs = 0;
-                    for (let i = 0; i < 5; i++) {
-                        cft = getMLFixedFee(cp || cmvTotal * 2);
-                        cs = (hasFreeShipping && wV > 0) ? getMLShippingCost(cp || cmvTotal * 2, wV) : shV;
-                        cp = calcPrice(cs, cft);
+                    // Nova lógica ML: frete baseado em peso × preço (sem taxa fixa separada)
+                    const calcMLPrice = (shippingFee: number) => {
+                        const fc = cmvTotal + shippingFee;
+                        if (calculationMode === 'margin') { const d = 1 - ((totalVarP + margin) / 100); return d > 0 ? fc / d : 0; }
+                        if (calculationMode === 'profit') { const d = 1 - (totalVarP / 100); return d > 0 ? (fc + tpV) / d : 0; }
+                        return parseFloat(desiredPrice) || 0;
+                    };
+
+                    // Iteração: o frete depende do preço e vice-versa
+                    let sp = 0, mlShip = 0;
+                    for (let i = 0; i < 8; i++) {
+                        const estimatedPrice = sp || cmvTotal * 2;
+                        if (mlEffectiveWeight > 0) {
+                            if (hasFreeShipping && estimatedPrice < 79) {
+                                mlShip = getMLFreeShippingFastCost(mlEffectiveWeight, mlReputationDiscount);
+                            } else {
+                                mlShip = getMLShippingCost(estimatedPrice, mlEffectiveWeight, mlReputationDiscount);
+                            }
+                        } else {
+                            mlShip = 0;
+                        }
+                        sp = calcMLPrice(mlShip);
                     }
-                    sp = cp; fs = cs;
+
+                    // Recalcular frete final com preço convergido
+                    if (mlEffectiveWeight > 0) {
+                        if (hasFreeShipping && sp < 79) {
+                            mlShip = getMLFreeShippingFastCost(mlEffectiveWeight, mlReputationDiscount);
+                        } else {
+                            mlShip = getMLShippingCost(sp, mlEffectiveWeight, mlReputationDiscount);
+                        }
+                    }
+
+                    setMlComputedShipping(mlShip);
+
+                    const ffc = cmvTotal + mlShip;
+                    const profit = sp - ffc - (sp * (totalVarP / 100));
+                    const am = sp > 0 ? (profit / sp) * 100 : margin;
+                    setPreviewResult({ price: sp, profit, margin: am });
                 } else {
-                    sp = calcPrice(shV, ftV);
+                    // Shein / Outro
+                    const calcPrice = (s: number, ft: number) => {
+                        const fc = cmvTotal + s + ft;
+                        if (calculationMode === 'margin') { const d = 1 - ((totalVarP + margin) / 100); return d > 0 ? fc / d : 0; }
+                        if (calculationMode === 'profit') { const d = 1 - (totalVarP / 100); return d > 0 ? (fc + tpV) / d : 0; }
+                        return parseFloat(desiredPrice) || 0;
+                    };
+
+                    const sp = calcPrice(shV, ftV);
+                    const ffc = cmvTotal + shV + ftV;
+                    const profit = sp - ffc - (sp * (totalVarP / 100));
+                    const am = sp > 0 ? (profit / sp) * 100 : margin;
+                    setPreviewResult({ price: sp, profit, margin: am });
                 }
-
-                const eft = platform === 'ml' ? getMLFixedFee(sp) : ftV;
-                const ffc = cmvTotal + fs + eft;
-                const profit = sp - ffc - (sp * (totalVarP / 100));
-                const am = sp > 0 ? (profit / sp) * 100 : margin;
-
-                // Update ML fixedTax inline (avoids a separate cascading useEffect)
-                if (platform === 'ml') {
-                    const cf = getMLFixedFee(sp);
-                    if (Math.abs(parseBrFloat(fixedTax || '0') - cf) > 0.01) setFixedTax(cf.toFixed(2));
-                }
-
-                setPreviewResult({ price: sp, profit, margin: am });
             }
         }, 300); // 300ms debounce
 
         return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
     }, [cmvTotal, commission, fixedTax, shippingCost, adTaxPercent, discountPercent,
         incomeTaxPercent, breakagePercent, collabPercent, targetProfit, weight, margin,
-        calculationMode, desiredPrice, platform, hasFreeShipping, mlListingType]);
+        calculationMode, desiredPrice, platform, hasFreeShipping, mlListingType,
+        mlEffectiveWeight, mlReputationDiscount]);
 
     const handleCalculate = () => {
         if (!previewResult) return;
-        const commV = platform === 'shopee' ? (previewResult.commissionPercent || 0) : (parseBrFloat(commission) || 0);
-        const ftV = platform === 'shopee' ? (previewResult.fixedFeeValue || 0) : (parseBrFloat(fixedTax) || 0);
-        const shV = platform === 'shopee' ? 0 : (parseBrFloat(shippingCost) || 0);
-        const atv = parseBrFloat(adTaxPercent) || 0;
-        const dv = parseBrFloat(discountPercent) || 0;
-        const itv = parseBrFloat(incomeTaxPercent) || 0;
-        const bv = parseBrFloat(breakagePercent) || 0;
-        const cv = parseBrFloat(collabPercent) || 0;
+        const commV = platform === 'shopee' ? (previewResult.commissionPercent || 0) : (parseFloat(commission) || 0);
+        const ftV = platform === 'shopee' ? (previewResult.fixedFeeValue || 0) : (parseFloat(fixedTax) || 0);
+        const shV = platform === 'shopee' ? 0 : (parseFloat(shippingCost) || 0);
+        const atv = parseFloat(adTaxPercent) || 0;
+        const dv = parseFloat(discountPercent) || 0;
+        const itv = parseFloat(incomeTaxPercent) || 0;
+        const bv = parseFloat(breakagePercent) || 0;
+        const cv = parseFloat(collabPercent) || 0;
         const totalVP = commV + atv + dv + itv + bv + cv;
         const totalTaxes = (previewResult.price * (totalVP / 100)) + ftV;
 
         const product: ProductData = {
             id: Date.now().toString(), name: name || 'Produto Sem Nome', sku: sku || 'N/A',
-            productCost: parseBrFloat(productCost) || 0, purchaseTax: parseBrFloat(purchaseTax) || 0,
-            purchaseShipping: parseBrFloat(purchaseShipping) || 0, packagingCost: parseBrFloat(packagingCost) || 0,
-            printingCost: parseBrFloat(printingCost) || 0, cmvTotal,
+            productCost: parseFloat(productCost) || 0, purchaseTax: parseFloat(purchaseTax) || 0,
+            purchaseShipping: parseFloat(purchaseShipping) || 0, packagingCost: parseFloat(packagingCost) || 0,
+            printingCost: parseFloat(printingCost) || 0, cmvTotal,
             cost: cmvTotal, fixedCost: 0, shippingCost: shV,
             adTaxPercent: atv, discountPercent: dv, taxPercent: commV, taxFixed: ftV,
             incomeTaxPercent: itv, breakagePercent: bv, collabPercent: cv,
             marginTarget: previewResult.margin, targetProfit: previewResult.profit,
-            targetPrice: parseBrFloat(desiredPrice) || 0, calculationMode, platform,
+            targetPrice: parseFloat(desiredPrice) || 0, calculationMode, platform,
             hasFreeShipping: platform === 'ml' ? hasFreeShipping : false,
-            weight: parseBrFloat(weight) || 0,
+            weight: parseFloat(weight) || 0,
         };
 
         setCurrentProduct(product);
@@ -387,32 +428,78 @@ const Calculator: React.FC = () => {
                                 Configurações Mercado Livre
                             </h3>
                             <div className="bg-surface p-3 rounded-xl border border-border flex flex-col gap-3">
-                                <button onClick={() => setHasFreeShipping(p => !p)}
-                                    className={`flex items-center justify-between p-4 rounded-xl border transition-all ${hasFreeShipping ? 'bg-brand-ml/20 border-brand-ml text-brand-ml' : 'bg-background/50 border-border text-text-sec hover:border-text-sec'}`}>
-                                    <div className="flex items-center gap-3">
-                                        <span className="material-symbols-outlined filled text-xl">local_shipping</span>
-                                        <div className="flex flex-col text-left">
-                                            <span className="text-sm font-bold">Oferecer Frete Grátis</span>
-                                            <span className="text-[10px] opacity-80">Cálculo automático por peso e preço</span>
-                                        </div>
-                                    </div>
-                                    <span className="material-symbols-outlined text-3xl">{hasFreeShipping ? 'toggle_on' : 'toggle_off'}</span>
-                                </button>
+                                {/* Tipo de anúncio */}
                                 <div className="flex bg-background rounded-lg p-1 border border-border">
                                     <button className={`flex-1 py-1 px-2 rounded-md text-xs font-bold transition-all ${mlListingType === 'classic' ? 'bg-brand-ml text-black shadow' : 'text-text-sec hover:text-white'}`}
                                         onClick={() => { setMlListingType('classic'); setCommission('12'); }}>Clássico (12%)</button>
                                     <button className={`flex-1 py-1 px-2 rounded-md text-xs font-bold transition-all ${mlListingType === 'premium' ? 'bg-brand-ml text-black shadow' : 'text-text-sec hover:text-white'}`}
                                         onClick={() => { setMlListingType('premium'); setCommission('17'); }}>Premium (17%)</button>
                                 </div>
-                                {hasFreeShipping && (
-                                    <label className="flex flex-col gap-2">
-                                        <span className="text-sm font-medium text-text-sec">Peso do Produto (gramas)</span>
-                                        <div className="relative">
-                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-text-sec font-semibold pointer-events-none">g</div>
-                                            <DebouncedInput value={weight} onValueChange={setWeight} label="" placeholder="Ex: 500"
-                                                inputClassName="w-full rounded-xl border border-border bg-input-surface py-3 pl-4 pr-12 text-white placeholder-text-sec focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all font-semibold" />
+
+                                {/* Frete Grátis Rápido */}
+                                <button onClick={() => setHasFreeShipping(p => !p)}
+                                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${hasFreeShipping ? 'bg-brand-ml/20 border-brand-ml text-brand-ml' : 'bg-background/50 border-border text-text-sec hover:border-text-sec'}`}>
+                                    <div className="flex items-center gap-3">
+                                        <span className="material-symbols-outlined filled text-xl">local_shipping</span>
+                                        <div className="flex flex-col text-left">
+                                            <span className="text-sm font-bold">Frete Grátis Rápido</span>
+                                            <span className="text-[10px] opacity-80">Ativar para produtos abaixo de R$79</span>
                                         </div>
-                                    </label>
+                                    </div>
+                                    <span className="material-symbols-outlined text-3xl">{hasFreeShipping ? 'toggle_on' : 'toggle_off'}</span>
+                                </button>
+
+                                {/* Desconto por reputação */}
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-text-sec">Desconto por Reputação</span>
+                                    <div className="flex bg-background rounded-lg p-1 border border-border">
+                                        <button className={`flex-1 py-1.5 px-2 rounded-md text-xs font-bold transition-all ${mlReputationDiscount === 0 ? 'bg-text-sec/20 text-white shadow' : 'text-text-sec hover:text-white'}`}
+                                            onClick={() => setMlReputationDiscount(0)}>Sem desconto</button>
+                                        <button className={`flex-1 py-1.5 px-2 rounded-md text-xs font-bold transition-all ${mlReputationDiscount === 0.25 ? 'bg-brand-ml text-black shadow' : 'text-text-sec hover:text-white'}`}
+                                            onClick={() => setMlReputationDiscount(0.25)}>25%</button>
+                                        <button className={`flex-1 py-1.5 px-2 rounded-md text-xs font-bold transition-all ${mlReputationDiscount === 0.50 ? 'bg-success text-white shadow' : 'text-text-sec hover:text-white'}`}
+                                            onClick={() => setMlReputationDiscount(0.50)}>50%</button>
+                                    </div>
+                                </div>
+
+                                {/* Peso real */}
+                                <DebouncedInput value={weight} onValueChange={setWeight} label="Peso Real (kg)" placeholder="Ex: 0.5"
+                                    inputClassName="w-full rounded-lg border border-border bg-input-surface py-2 pl-3 pr-10 text-white placeholder-text-sec focus:border-brand-ml focus:ring-1 focus:ring-brand-ml outline-none transition-all font-semibold text-sm" />
+
+                                {/* Dimensões */}
+                                <div className="bg-brand-ml/5 border border-brand-ml/20 rounded-xl p-3 flex flex-col gap-2">
+                                    <div className="flex items-center gap-2 text-brand-ml font-bold text-xs">
+                                        <span className="material-symbols-outlined text-sm">deployed_code</span>
+                                        Dimensões da Embalagem (cm)
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <DebouncedInput value={mlHeight} onValueChange={setMlHeight} label="Altura" placeholder="0"
+                                            inputClassName="w-full rounded-lg border border-border bg-input-surface p-2 text-center text-white focus:border-brand-ml outline-none text-sm" />
+                                        <DebouncedInput value={mlWidth} onValueChange={setMlWidth} label="Largura" placeholder="0"
+                                            inputClassName="w-full rounded-lg border border-border bg-input-surface p-2 text-center text-white focus:border-brand-ml outline-none text-sm" />
+                                        <DebouncedInput value={mlLength} onValueChange={setMlLength} label="Comprimento" placeholder="0"
+                                            inputClassName="w-full rounded-lg border border-border bg-input-surface p-2 text-center text-white focus:border-brand-ml outline-none text-sm" />
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs text-text-sec pt-2 border-t border-border/50">
+                                        <span>Peso Cubado: {mlCubicWeight.toFixed(4)} kg</span>
+                                        <span>Peso Efetivo: <strong className="text-white">{mlEffectiveWeight.toFixed(2)} kg</strong></span>
+                                    </div>
+                                </div>
+
+                                {/* Custo de frete calculado */}
+                                {mlEffectiveWeight > 0 && (
+                                    <div className="p-3 rounded-lg bg-brand-ml/10 border border-brand-ml/20 flex justify-between items-center">
+                                        <div className="flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-brand-ml text-lg">payments</span>
+                                            <span className="text-sm font-bold text-brand-ml">Custo de Frete</span>
+                                        </div>
+                                        <span className="text-lg font-extrabold text-white">
+                                            {mlComputedShipping.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            {mlReputationDiscount > 0 && (
+                                                <span className="text-[10px] text-success ml-1">(-{mlReputationDiscount * 100}%)</span>
+                                            )}
+                                        </span>
+                                    </div>
                                 )}
                             </div>
                         </section>
@@ -435,7 +522,7 @@ const Calculator: React.FC = () => {
                                         inputClassName="w-full rounded-lg border border-border bg-input-surface p-2 text-center text-white focus:border-brand-shein outline-none" />
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-text-sec pt-2 border-t border-border/50">
-                                    <span>Peso Cubado: {((parseBrFloat(sheinHeight) || 0) * (parseBrFloat(sheinWidth) || 0) * (parseBrFloat(sheinLength) || 0) / 6000).toFixed(4)} kg</span>
+                                    <span>Peso Cubado: {((parseFloat(sheinHeight) || 0) * (parseFloat(sheinWidth) || 0) * (parseFloat(sheinLength) || 0) / 6000).toFixed(4)} kg</span>
                                     <span className="font-bold text-brand-shein">Intervenção: R$ {fixedTax}</span>
                                 </div>
                             </div>
@@ -619,6 +706,25 @@ const Calculator: React.FC = () => {
                             )}
                         </>)}
                     </div>
+
+                    {/* Alerta: trocar para Premium quando preço > R$99 */}
+                    {platform === 'ml' && mlListingType === 'classic' && previewResult && previewResult.price > 99 && (
+                        <div className="mt-2 p-3 rounded-xl bg-brand-ml/10 border border-brand-ml/30 flex items-start gap-3 animate-slide-up">
+                            <span className="material-symbols-outlined text-brand-ml text-xl mt-0.5 filled">warning</span>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-sm font-bold text-brand-ml">Recomendação: Anúncio Premium</span>
+                                <span className="text-xs text-text-sec">
+                                    O preço calculado passou de <strong className="text-white">R$ 99,00</strong>. Para produtos acima desse valor, o anúncio <strong className="text-brand-ml">Premium (17%)</strong> oferece maior visibilidade e pode gerar mais vendas.
+                                </span>
+                                <button
+                                    onClick={() => { setMlListingType('premium'); setCommission('17'); }}
+                                    className="mt-1 self-start px-3 py-1.5 rounded-lg bg-brand-ml text-black text-xs font-bold hover:brightness-110 transition-all active:scale-95"
+                                >
+                                    Trocar para Premium
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     <button onClick={handleCalculate} disabled={!previewResult}
                         className="w-full bg-primary hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-white text-base font-bold py-3 rounded-xl shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 active:scale-[0.98] flex items-center justify-center gap-2 mt-2">

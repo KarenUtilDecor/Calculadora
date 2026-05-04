@@ -1,58 +1,193 @@
 /**
- * Custo de envio do Mercado Livre baseado no preço e peso.
- * Baseado nas tabelas fornecidas pelo usuário.
+ * Custo de envio do Mercado Livre — Nova Política 2025
+ * Baseado em peso (kg) × faixa de preço de venda.
+ * Inclui tabela de frete grátis rápido opcional para produtos abaixo de R$79.
  */
 
-// Tabela de Custo Fixo do ML baseada no preço de venda
-export const getMLFixedFee = (price: number): number => {
-    if (price < 12.50) return 0.50; // R$ 0.50 (User specified) - Usually ML min is higher but following prompt
-    if (price < 29.00) return 6.25;
-    if (price < 50.00) return 6.50;
-    if (price <= 79.00) return 6.75;
-    return 0.00; // Acima de 79 is free
+// Faixas de peso em KG (limite superior)
+const WEIGHT_LIMITS = [
+    0.3, 0.5, 1, 1.5, 2, 3, 4, 5, 6, 7, 8, 9, 11, 13, 15, 17, 20, 25, 30,
+    40, 50, 60, 70, 80, 90, 100, 125, 150, Infinity
+];
+
+// Faixas de preço (limite superior)
+const PRICE_LIMITS = [18.99, 48.99, 78.99, 99.99, 119.99, 149.99, 199.99, Infinity];
+
+// Tabela principal: costs[weightIndex][priceIndex]
+const SHIPPING_TABLE: number[][] = [
+    // Até 0,3 kg
+    [5.65, 6.55, 7.75, 12.35, 14.35, 16.45, 18.45, 20.95],
+    // 0,3 - 0,5 kg
+    [5.95, 6.65, 7.85, 13.25, 15.45, 17.65, 19.85, 22.55],
+    // 0,5 - 1 kg
+    [6.05, 6.75, 7.95, 13.85, 16.15, 18.45, 20.75, 23.65],
+    // 1 - 1,5 kg
+    [6.15, 6.85, 8.05, 14.15, 16.45, 18.85, 21.15, 24.65],
+    // 1,5 - 2 kg
+    [6.25, 6.95, 8.15, 14.45, 16.85, 19.25, 21.65, 24.65],
+    // 2 - 3 kg
+    [6.35, 7.95, 8.55, 15.75, 18.35, 21.05, 23.65, 26.25],
+    // 3 - 4 kg
+    [6.45, 8.15, 8.95, 17.05, 19.85, 22.65, 25.65, 28.35],
+    // 4 - 5 kg
+    [6.55, 8.35, 9.75, 18.45, 21.55, 24.65, 27.75, 30.75],
+    // 5 - 6 kg
+    [6.65, 8.55, 9.95, 25.45, 28.55, 32.65, 36.05, 40.05],
+    // 6 - 7 kg
+    [6.75, 8.75, 10.15, 27.05, 31.05, 36.05, 40.05, 44.05],
+    // 7 - 8 kg
+    [6.85, 8.95, 10.35, 28.85, 33.65, 38.45, 43.45, 48.05],
+    // 8 - 9 kg
+    [6.95, 9.15, 10.55, 29.65, 34.55, 39.55, 44.45, 49.35],
+    // 9 - 11 kg
+    [7.05, 9.55, 10.95, 41.25, 48.05, 54.95, 61.75, 68.65],
+    // 11 - 13 kg
+    [7.15, 9.95, 11.35, 42.15, 49.25, 56.25, 63.25, 70.25],
+    // 13 - 15 kg
+    [7.25, 10.15, 11.55, 45.05, 52.45, 59.95, 67.45, 74.95],
+    // 15 - 17 kg
+    [7.35, 10.35, 11.75, 48.55, 56.05, 63.55, 70.75, 78.65],
+    // 17 - 20 kg
+    [7.45, 10.55, 11.95, 54.75, 63.85, 72.95, 82.05, 91.15],
+    // 20 - 25 kg
+    [7.65, 10.95, 12.15, 64.05, 75.05, 84.75, 95.35, 106.95],
+    // 25 - 30 kg
+    [7.75, 11.15, 12.35, 65.95, 78.95, 88.55, 96.25, 106.95],
+    // 30 - 40 kg
+    [7.85, 11.55, 12.55, 67.75, 78.95, 88.95, 99.15, 107.05],
+    // 40 - 50 kg
+    [7.95, 11.55, 12.75, 70.25, 81.05, 92.05, 102.55, 110.75],
+    // 50 - 60 kg
+    [8.05, 11.75, 12.95, 74.95, 86.45, 98.15, 109.35, 118.15],
+    // 60 - 70 kg
+    [8.15, 11.95, 13.15, 80.25, 92.95, 105.05, 117.15, 126.55],
+    // 70 - 80 kg
+    [8.25, 12.15, 13.35, 83.95, 97.05, 109.85, 122.45, 132.25],
+    // 80 - 90 kg
+    [8.35, 12.35, 13.55, 93.25, 107.45, 122.05, 136.05, 146.95],
+    // 90 - 100 kg
+    [8.45, 12.55, 13.75, 106.55, 123.95, 139.55, 155.55, 167.95],
+    // 100 - 125 kg
+    [8.55, 12.75, 13.95, 119.25, 138.05, 156.05, 173.95, 187.95],
+    // 125 - 150 kg
+    [8.65, 12.75, 14.15, 126.55, 146.15, 165.65, 184.65, 199.45],
+    // Mais de 150 kg
+    [8.75, 12.95, 14.35, 166.15, 192.45, 217.55, 242.55, 261.95],
+];
+
+// Tabela de frete grátis rápido para produtos abaixo de R$79 (opcional)
+const FREE_SHIPPING_FAST_TABLE: number[] = [
+    12.35, // Até 0,3 kg
+    13.25, // 0,3 - 0,5 kg
+    13.85, // 0,5 - 1 kg
+    14.15, // 1 - 1,5 kg
+    14.45, // 1,5 - 2 kg
+    15.75, // 2 - 3 kg
+    17.05, // 3 - 4 kg
+    18.45, // 4 - 5 kg
+    25.45, // 5 - 6 kg
+    27.05, // 6 - 7 kg
+    28.85, // 7 - 8 kg
+    29.65, // 8 - 9 kg
+    41.25, // 9 - 11 kg
+    42.15, // 11 - 13 kg
+    45.05, // 13 - 15 kg
+    48.55, // 15 - 17 kg
+    54.75, // 17 - 20 kg
+    64.05, // 20 - 25 kg
+    65.95, // 25 - 30 kg
+    67.75, // 30 - 40 kg
+    70.25, // 40 - 50 kg
+    74.95, // 50 - 60 kg
+    80.25, // 60 - 70 kg
+    83.95, // 70 - 80 kg
+    93.25, // 80 - 90 kg
+    106.55, // 90 - 100 kg
+    119.25, // 100 - 125 kg
+    126.55, // 125 - 150 kg
+    166.15, // Mais de 150 kg
+];
+
+/**
+ * Encontra o índice da faixa de peso
+ */
+const getWeightIndex = (weightKg: number): number => {
+    return WEIGHT_LIMITS.findIndex(limit => weightKg <= limit);
 };
 
-export const getMLShippingCost = (price: number, weightInGrams: number): number => {
-    // Caso especial: Preço entre 19 e 78,99 o ML paga o frete (custo zero para o vendedor)
-    if (price >= 19 && price <= 78.99) {
-        return 0;
-    }
-
-    const weights = [300, 500, 1000, 2000, 3000, 4000, 5000, 9000, 13000, 17000, 23000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, 125000, 150000, Infinity];
-
-    let tableIndex = -1;
-    if (price < 19) {
-        tableIndex = 0; // Tabela 1: < 79 (usada aqui para < 19 conforme regra)
-    } else if (price >= 79 && price <= 99.99) {
-        tableIndex = 1; // Tabela 2
-    } else if (price >= 100 && price <= 119.99) {
-        tableIndex = 2; // Tabela 3
-    } else if (price >= 120 && price <= 149.99) {
-        tableIndex = 3; // Tabela 4
-    } else if (price >= 150 && price <= 199.99) {
-        tableIndex = 4; // Tabela 5
-    } else if (price >= 200) {
-        tableIndex = 5; // Tabela 6
-    } else {
-        // Fallback para segurança caso algo escape das faixas
-        return 0;
-    }
-
-    const costs = [
-        // Tabela 1: Produtos novos < 79 (usado para < 19), usados e Grátis
-        [39.9, 42.9, 44.9, 46.9, 49.9, 53.9, 56.9, 88.9, 131.9, 146.9, 171.9, 197.9, 203.9, 210.9, 224.9, 240.9, 251.9, 279.9, 319.9, 357.9, 379.9, 498.9],
-        // Tabela 2: 79 a 99,99
-        [11.97, 12.87, 13.47, 14.07, 14.97, 16.17, 17.07, 26.67, 39.57, 44.07, 51.57, 59.37, 61.17, 63.27, 67.47, 72.27, 75.57, 83.97, 95.97, 107.37, 113.97, 149.67],
-        // Tabela 3: 100 a 119,99
-        [13.97, 15.02, 15.72, 16.42, 17.47, 18.87, 19.92, 31.12, 46.17, 51.42, 60.17, 69.27, 71.37, 73.82, 78.72, 84.32, 88.17, 97.97, 111.97, 125.27, 132.97, 174.62],
-        // Tabela 4: 120 a 149,99
-        [15.96, 17.16, 17.96, 18.76, 19.96, 21.56, 22.76, 35.56, 52.76, 58.76, 68.76, 79.16, 81.56, 84.36, 89.96, 96.36, 100.76, 111.96, 127.96, 143.16, 151.96, 199.56],
-        // Tabela 5: 150 a 199,99
-        [17.96, 19.31, 20.21, 21.11, 22.46, 24.26, 25.61, 40.01, 59.36, 66.11, 77.36, 89.06, 91.76, 94.91, 101.21, 108.41, 113.36, 125.96, 143.96, 161.06, 170.96, 224.51],
-        // Tabela 6: > 200
-        [19.95, 21.45, 22.45, 23.45, 24.95, 26.95, 28.45, 44.45, 65.95, 73.45, 85.95, 98.95, 101.95, 105.45, 112.45, 120.45, 125.95, 139.95, 159.95, 178.95, 189.95, 249.45]
-    ];
-
-    const weightIndex = weights.findIndex(w => weightInGrams <= w);
-    return costs[tableIndex][weightIndex];
+/**
+ * Encontra o índice da faixa de preço
+ */
+const getPriceIndex = (price: number): number => {
+    return PRICE_LIMITS.findIndex(limit => price <= limit);
 };
+
+/**
+ * Calcula o peso cubado em kg a partir das dimensões em cm
+ */
+export const calculateMLCubicWeight = (height: number, width: number, length: number): number => {
+    return (height * width * length) / 6000;
+};
+
+/**
+ * Retorna o maior entre peso real e peso cubado
+ */
+export const getEffectiveWeight = (realWeightKg: number, height: number, width: number, length: number): number => {
+    const cubicWeight = calculateMLCubicWeight(height, width, length);
+    return Math.max(realWeightKg, cubicWeight);
+};
+
+/**
+ * Retorna o custo de frete do ML baseado no preço de venda e peso em KG.
+ * @param price Preço de venda em R$
+ * @param weightKg Peso efetivo em KG (maior entre real e cubado)
+ * @param reputationDiscount Desconto por reputação (0, 0.25 ou 0.50)
+ */
+export const getMLShippingCost = (price: number, weightKg: number, reputationDiscount: number = 0): number => {
+    if (weightKg <= 0) return 0;
+
+    const wIdx = getWeightIndex(weightKg);
+    const pIdx = getPriceIndex(price);
+
+    if (wIdx < 0 || pIdx < 0) return 0;
+
+    const baseCost = SHIPPING_TABLE[wIdx][pIdx];
+    return baseCost * (1 - reputationDiscount);
+};
+
+/**
+ * Retorna o custo para oferecer frete grátis rápido em produtos abaixo de R$79.
+ * @param weightKg Peso efetivo em KG
+ * @param reputationDiscount Desconto por reputação (0, 0.25 ou 0.50)
+ */
+export const getMLFreeShippingFastCost = (weightKg: number, reputationDiscount: number = 0): number => {
+    if (weightKg <= 0) return 0;
+
+    const wIdx = getWeightIndex(weightKg);
+    if (wIdx < 0) return 0;
+
+    const baseCost = FREE_SHIPPING_FAST_TABLE[wIdx];
+    return baseCost * (1 - reputationDiscount);
+};
+
+/**
+ * Regras de frete grátis do ML:
+ * - R$19 a R$78,99: ML oferece frete grátis PADRÃO automaticamente
+ * - R$79+: ML oferece frete grátis RÁPIDO automaticamente
+ * - Abaixo de R$79: Frete grátis rápido é OPCIONAL (vendedor paga)
+ */
+export const getMLFreeShippingType = (price: number): 'none' | 'standard' | 'fast' => {
+    if (price >= 79) return 'fast';
+    if (price >= 19) return 'standard';
+    return 'none';
+};
+
+// Labels das faixas de peso para exibição
+export const WEIGHT_LABELS = [
+    'Até 0,3 kg', '0,3 - 0,5 kg', '0,5 - 1 kg', '1 - 1,5 kg', '1,5 - 2 kg',
+    '2 - 3 kg', '3 - 4 kg', '4 - 5 kg', '5 - 6 kg', '6 - 7 kg', '7 - 8 kg',
+    '8 - 9 kg', '9 - 11 kg', '11 - 13 kg', '13 - 15 kg', '15 - 17 kg',
+    '17 - 20 kg', '20 - 25 kg', '25 - 30 kg', '30 - 40 kg', '40 - 50 kg',
+    '50 - 60 kg', '60 - 70 kg', '70 - 80 kg', '80 - 90 kg', '90 - 100 kg',
+    '100 - 125 kg', '125 - 150 kg', 'Mais de 150 kg',
+];
