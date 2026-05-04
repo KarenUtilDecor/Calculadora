@@ -40,13 +40,14 @@ const DebouncedInput: React.FC<{
         const v = e.target.value;
         if (v === '' || v === '-' || /^-?\d*[.,]?\d*$/.test(v)) {
             setLocalValue(v);
-            pushToParent(v);
+            // Converter vírgula para ponto antes de enviar ao parent
+            pushToParent(v.replace(',', '.'));
         }
     };
 
     const handleBlur = () => {
         if (timerRef.current) clearTimeout(timerRef.current);
-        onValueChange(localValue);
+        onValueChange(localValue.replace(',', '.'));
     };
 
     const isCurrency = type === 'currency';
@@ -513,9 +514,13 @@ const Calculator: React.FC = () => {
                             {platform !== 'shopee' && (
                                 <div className="grid grid-cols-2 gap-2 pb-2 mb-2 border-b border-border/50">
                                     <PercentInput label="Comissão" value={commission} onChange={setCommission} />
-                                    <CurrencyInput label="Taxa Fixa (Plat.)" value={fixedTax}
-                                        onChange={(v) => { if (platform === 'other') setFixedTax(v); }} />
-                                    <CurrencyInput label="Frete de Envio" value={shippingCost} onChange={setShippingCost} />
+                                    {platform !== 'ml' && (
+                                        <CurrencyInput label="Taxa Fixa (Plat.)" value={fixedTax}
+                                            onChange={(v) => { if (platform === 'other') setFixedTax(v); }} />
+                                    )}
+                                    {platform !== 'ml' && (
+                                        <CurrencyInput label="Frete de Envio" value={shippingCost} onChange={setShippingCost} />
+                                    )}
                                 </div>
                             )}
                             <div className="grid grid-cols-2 gap-2">
