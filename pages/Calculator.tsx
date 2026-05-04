@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
 import { Platform, ProductData } from '../types';
-import { getMLShippingCost, getMLFreeShippingFastCost, getEffectiveWeight, calculateMLCubicWeight } from '../lib/mlShipping';
+import { getMLShippingCost, getMLFreeShippingFastCost } from '../lib/mlShipping';
 import { getSheinShippingFee } from '../lib/sheinShipping';
 import { getShopeeCommission, calculateShopeePriceForMargin, calculateShopeePriceForProfit, SHOPEE_BRACKETS } from '../lib/shopeeCommission';
 
@@ -130,9 +130,6 @@ const Calculator: React.FC = () => {
     const [hasFreeShipping, setHasFreeShipping] = useState(false);
     const [weight, setWeight] = useState('');
     const [mlListingType, setMlListingType] = useState<'classic' | 'premium'>('classic');
-    const [mlHeight, setMlHeight] = useState('');
-    const [mlWidth, setMlWidth] = useState('');
-    const [mlLength, setMlLength] = useState('');
     const [mlReputationDiscount, setMlReputationDiscount] = useState<number>(0);
     const [mlComputedShipping, setMlComputedShipping] = useState<number>(0);
 
@@ -141,24 +138,8 @@ const Calculator: React.FC = () => {
     const [sheinWidth, setSheinWidth] = useState('');
     const [sheinLength, setSheinLength] = useState('');
 
-    // Compute ML effective weight (max of real weight and cubic weight)
-    const mlEffectiveWeight = useMemo(() => {
-        const realW = parseFloat(weight) || 0;
-        const h = parseFloat(mlHeight) || 0;
-        const w = parseFloat(mlWidth) || 0;
-        const l = parseFloat(mlLength) || 0;
-        if (h > 0 && w > 0 && l > 0) {
-            return getEffectiveWeight(realW, h, w, l);
-        }
-        return realW;
-    }, [weight, mlHeight, mlWidth, mlLength]);
-
-    const mlCubicWeight = useMemo(() => {
-        const h = parseFloat(mlHeight) || 0;
-        const w = parseFloat(mlWidth) || 0;
-        const l = parseFloat(mlLength) || 0;
-        return calculateMLCubicWeight(h, w, l);
-    }, [mlHeight, mlWidth, mlLength]);
+    // ML weight in kg (simple parse)
+    const mlWeightKg = useMemo(() => parseFloat(weight) || 0, [weight]);
 
     const handlePlatformChange = (p: Platform) => {
         setPlatform(p);
@@ -259,11 +240,12 @@ const Calculator: React.FC = () => {
                     let sp = 0, mlShip = 0;
                     for (let i = 0; i < 8; i++) {
                         const estimatedPrice = sp || cmvTotal * 2;
-                        if (mlEffectiveWeight > 0) {
-                            if (hasFreeShipping && estimatedPrice < 79) {
-                                mlShip = getMLFreeShippingFastCost(mlEffectiveWeight, mlReputationDiscount);
+                        if (mlWeightKg > 0) {
+                            // Frete grátis rápido automático: se preço < 79
+                            if (estimatedPrice < 79) {
+                                mlShip = getMLFreeShippingFastCost(mlWeightKg, mlReputationDiscount);
                             } else {
-                                mlShip = getMLShippingCost(estimatedPrice, mlEffectiveWeight, mlReputationDiscount);
+                                mlShip = getMLShippingCost(estimatedPrice, mlWeightKg, mlReputationDiscount);
                             }
                         } else {
                             mlShip = 0;
@@ -272,13 +254,16 @@ const Calculator: React.FC = () => {
                     }
 
                     // Recalcular frete final com preço convergido
-                    if (mlEffectiveWeight > 0) {
-                        if (hasFreeShipping && sp < 79) {
-                            mlShip = getMLFreeShippingFastCost(mlEffectiveWeight, mlReputationDiscount);
+                    if (mlWeightKg > 0) {
+                        if (sp < 79) {
+                            mlShip = getMLFreeShippingFastCost(mlWeightKg, mlReputationDiscount);
                         } else {
-                            mlShip = getMLShippingCost(sp, mlEffectiveWeight, mlReputationDiscount);
+                            mlShip = getMLShippingCost(sp, mlWeightKg, mlReputationDiscount);
                         }
                     }
+
+                    // Auto-set frete grátis baseado no preço
+                    setHasFreeShipping(sp < 79);
 
                     setMlComputedShipping(mlShip);
 
@@ -307,8 +292,8 @@ const Calculator: React.FC = () => {
         return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
     }, [cmvTotal, commission, fixedTax, shippingCost, adTaxPercent, discountPercent,
         incomeTaxPercent, breakagePercent, collabPercent, targetProfit, weight, margin,
-        calculationMode, desiredPrice, platform, hasFreeShipping, mlListingType,
-        mlEffectiveWeight, mlReputationDiscount]);
+        calculationMode, desiredPrice, platform, mlListingType,
+        mlWeightKg, mlReputationDiscount]);
 
     const handleCalculate = () => {
         if (!previewResult) return;
@@ -436,19 +421,6 @@ const Calculator: React.FC = () => {
                                         onClick={() => { setMlListingType('premium'); setCommission('17'); }}>Premium (17%)</button>
                                 </div>
 
-                                {/* Frete Grátis Rápido */}
-                                <button onClick={() => setHasFreeShipping(p => !p)}
-                                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${hasFreeShipping ? 'bg-brand-ml/20 border-brand-ml text-brand-ml' : 'bg-background/50 border-border text-text-sec hover:border-text-sec'}`}>
-                                    <div className="flex items-center gap-3">
-                                        <span className="material-symbols-outlined filled text-xl">local_shipping</span>
-                                        <div className="flex flex-col text-left">
-                                            <span className="text-sm font-bold">Frete Grátis Rápido</span>
-                                            <span className="text-[10px] opacity-80">Ativar para produtos abaixo de R$79</span>
-                                        </div>
-                                    </div>
-                                    <span className="material-symbols-outlined text-3xl">{hasFreeShipping ? 'toggle_on' : 'toggle_off'}</span>
-                                </button>
-
                                 {/* Desconto por reputação */}
                                 <div className="flex flex-col gap-1">
                                     <span className="text-xs font-medium text-text-sec">Desconto por Reputação</span>
@@ -462,43 +434,16 @@ const Calculator: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Peso real */}
-                                <DebouncedInput value={weight} onValueChange={setWeight} label="Peso Real (kg)" placeholder="Ex: 0.5"
+                                {/* Peso do produto */}
+                                <DebouncedInput value={weight} onValueChange={setWeight} label="Peso do Produto (kg)" placeholder="Ex: 0.5"
                                     inputClassName="w-full rounded-lg border border-border bg-input-surface py-2 pl-3 pr-10 text-white placeholder-text-sec focus:border-brand-ml focus:ring-1 focus:ring-brand-ml outline-none transition-all font-semibold text-sm" />
 
-                                {/* Dimensões */}
-                                <div className="bg-brand-ml/5 border border-brand-ml/20 rounded-xl p-3 flex flex-col gap-2">
-                                    <div className="flex items-center gap-2 text-brand-ml font-bold text-xs">
-                                        <span className="material-symbols-outlined text-sm">deployed_code</span>
-                                        Dimensões da Embalagem (cm)
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <DebouncedInput value={mlHeight} onValueChange={setMlHeight} label="Altura" placeholder="0"
-                                            inputClassName="w-full rounded-lg border border-border bg-input-surface p-2 text-center text-white focus:border-brand-ml outline-none text-sm" />
-                                        <DebouncedInput value={mlWidth} onValueChange={setMlWidth} label="Largura" placeholder="0"
-                                            inputClassName="w-full rounded-lg border border-border bg-input-surface p-2 text-center text-white focus:border-brand-ml outline-none text-sm" />
-                                        <DebouncedInput value={mlLength} onValueChange={setMlLength} label="Comprimento" placeholder="0"
-                                            inputClassName="w-full rounded-lg border border-border bg-input-surface p-2 text-center text-white focus:border-brand-ml outline-none text-sm" />
-                                    </div>
-                                    <div className="flex justify-between items-center text-xs text-text-sec pt-2 border-t border-border/50">
-                                        <span>Peso Cubado: {mlCubicWeight.toFixed(4)} kg</span>
-                                        <span>Peso Efetivo: <strong className="text-white">{mlEffectiveWeight.toFixed(2)} kg</strong></span>
-                                    </div>
-                                </div>
-
-                                {/* Custo de frete calculado */}
-                                {mlEffectiveWeight > 0 && (
-                                    <div className="p-3 rounded-lg bg-brand-ml/10 border border-brand-ml/20 flex justify-between items-center">
-                                        <div className="flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-brand-ml text-lg">payments</span>
-                                            <span className="text-sm font-bold text-brand-ml">Custo de Frete</span>
-                                        </div>
-                                        <span className="text-lg font-extrabold text-white">
-                                            {mlComputedShipping.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                            {mlReputationDiscount > 0 && (
-                                                <span className="text-[10px] text-success ml-1">(-{mlReputationDiscount * 100}%)</span>
-                                            )}
-                                        </span>
+                                {/* Indicador de frete grátis automático */}
+                                {previewResult && hasFreeShipping && (
+                                    <div className="flex items-center gap-2 p-2 rounded-lg bg-brand-ml/10 border border-brand-ml/20 text-xs">
+                                        <span className="material-symbols-outlined text-brand-ml text-sm filled">local_shipping</span>
+                                        <span className="text-brand-ml font-bold">Frete Grátis Rápido ativo</span>
+                                        <span className="text-text-sec">— Produto abaixo de R$79</span>
                                     </div>
                                 )}
                             </div>
@@ -652,6 +597,25 @@ const Calculator: React.FC = () => {
                             )}
                         </div>
                     </section>
+
+                    {/* ML Custo de Frete — acima do preview */}
+                    {platform === 'ml' && mlWeightKg > 0 && previewResult && (
+                        <div className="mt-2 p-3 rounded-xl bg-brand-ml/10 border border-brand-ml/20 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-brand-ml text-lg">payments</span>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-bold text-brand-ml">Custo de Frete ML</span>
+                                    <span className="text-[10px] text-text-sec">{hasFreeShipping ? 'Frete Grátis Rápido (< R$79)' : 'Frete por peso e preço'}</span>
+                                </div>
+                            </div>
+                            <span className="text-lg font-extrabold text-white">
+                                {mlComputedShipping.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                {mlReputationDiscount > 0 && (
+                                    <span className="text-[10px] text-success ml-1">(-{mlReputationDiscount * 100}%)</span>
+                                )}
+                            </span>
+                        </div>
+                    )}
 
                     {/* Preview — always in DOM to prevent layout shifts that close mobile keyboard */}
                     <div className={`mt-2 rounded-xl p-3 border bg-surface border-border transition-all duration-200 ${previewResult ? 'opacity-100' : 'opacity-0 pointer-events-none h-0 p-0 m-0 border-0 overflow-hidden'}`}>
