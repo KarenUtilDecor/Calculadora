@@ -26,13 +26,13 @@
                         primary: "#6366F1",
                         "primary-dark": "#4F46E5",
                         "primary-glow": "rgba(99, 102, 241, 0.5)",
-                        background: "#0F1219",
-                        surface: "#1A1F29",
-                        "surface-card": "#1C212C",
-                        "input-surface": "#11141A",
-                        border: "#2B3240",
-                        "text-main": "#FFFFFF",
-                        "text-sec": "#94A3B8",
+                        background: "var(--color-background)",
+                        surface: "var(--color-surface)",
+                        "surface-card": "var(--color-surface-card)",
+                        "input-surface": "var(--color-input-surface)",
+                        border: "var(--color-border)",
+                        "text-main": "var(--color-text-main)",
+                        "text-sec": "var(--color-text-sec)",
                         "brand-ml": "#FFE600",
                         "brand-shopee": "#FF5722",
                         "brand-shein": "#F5F5F5",
@@ -51,9 +51,42 @@
         }
     </script>
     <style>
+        /* Dark theme (default) */
+        :root, .dark {
+            --color-background: #0F1219;
+            --color-surface: #1A1F29;
+            --color-surface-card: #1C212C;
+            --color-input-surface: #11141A;
+            --color-border: #2B3240;
+            --color-text-main: #FFFFFF;
+            --color-text-sec: #94A3B8;
+        }
+
+        /* Light theme */
+        .light {
+            --color-background: #F0F2F5;
+            --color-surface: #FFFFFF;
+            --color-surface-card: #FFFFFF;
+            --color-input-surface: #F7F8FA;
+            --color-border: #E2E5EA;
+            --color-text-main: #1A1D23;
+            --color-text-sec: #64748B;
+        }
+
         body {
-            background-color: #0F1219;
+            background-color: var(--color-background);
             min-height: 100vh;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Smooth theme transitions */
+        *, *::before, *::after {
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        /* Light mode text color overrides */
+        .light .text-white {
+            color: var(--color-text-main) !important;
         }
 
         .material-symbols-outlined {
@@ -92,7 +125,7 @@
     <link rel="stylesheet" href="/index.css">
 </head>
 
-<body class="bg-background text-text-main font-display antialiased selection:bg-primary/30 selection:text-white">
+<body class="bg-background text-text-main font-display antialiased selection:bg-primary/30">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>

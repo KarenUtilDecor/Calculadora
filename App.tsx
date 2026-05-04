@@ -6,6 +6,7 @@ import SavedProducts from './pages/SavedProducts';
 import Auth from './pages/Auth';
 import { ProductData, CalculationResult } from './types';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { supabase } from './lib/supabase';
 
 // --- Context Setup ---
@@ -265,6 +266,7 @@ const Sidebar = () => {
             </nav>
 
             <div className="p-4 mt-auto border-t border-border flex flex-col gap-2">
+                <ThemeToggleButton collapsed={isCollapsed} />
                 <button
                     onClick={toggleSidebar}
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-text-sec hover:text-white hover:bg-white/5 transition-all mb-2 ${isCollapsed ? 'justify-center px-0' : ''
@@ -340,6 +342,36 @@ const Sidebar = () => {
     );
 };
 
+// --- Theme Toggle Button ---
+const ThemeToggleButton: React.FC<{ collapsed?: boolean; mobile?: boolean }> = ({ collapsed = false, mobile = false }) => {
+    const { theme, toggleTheme } = useTheme();
+    const isDark = theme === 'dark';
+
+    if (mobile) {
+        return (
+            <button
+                onClick={toggleTheme}
+                className={`flex flex-col items-center gap-1 text-text-sec`}
+                title={isDark ? 'Modo Claro' : 'Modo Escuro'}
+            >
+                <span className="material-symbols-outlined">{isDark ? 'light_mode' : 'dark_mode'}</span>
+                <span className="text-[10px] font-bold">{isDark ? 'Claro' : 'Escuro'}</span>
+            </button>
+        );
+    }
+
+    return (
+        <button
+            onClick={toggleTheme}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-text-sec hover:text-white hover:bg-white/5 transition-all ${collapsed ? 'justify-center px-0' : ''}`}
+            title={isDark ? 'Modo Claro' : 'Modo Escuro'}
+        >
+            <span className="material-symbols-outlined">{isDark ? 'light_mode' : 'dark_mode'}</span>
+            {!collapsed && <span>{isDark ? 'Modo Claro' : 'Modo Escuro'}</span>}
+        </button>
+    );
+};
+
 // --- Layout & Navigation ---
 const BottomNav = () => {
     const navigate = useNavigate();
@@ -367,6 +399,7 @@ const BottomNav = () => {
                     <span className={`material-symbols-outlined ${isActive('/saved') ? 'filled' : ''}`}>inventory_2</span>
                     <span className="text-[10px] font-bold">Salvos</span>
                 </button>
+                <ThemeToggleButton mobile />
             </div>
         </div>
     );
@@ -389,22 +422,24 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const App = () => {
     return (
-        <AuthProvider>
-            <SidebarProvider>
-                <AppProvider>
-                    <HashRouter>
-                        <Layout>
-                            <Routes>
-                                <Route path="/auth" element={<Auth />} />
-                                <Route path="/" element={<PrivateRoute><Calculator /></PrivateRoute>} />
-                                <Route path="/results" element={<PrivateRoute><Results /></PrivateRoute>} />
-                                <Route path="/saved" element={<PrivateRoute><SavedProducts /></PrivateRoute>} />
-                            </Routes>
-                        </Layout>
-                    </HashRouter>
-                </AppProvider>
-            </SidebarProvider>
-        </AuthProvider>
+        <ThemeProvider>
+            <AuthProvider>
+                <SidebarProvider>
+                    <AppProvider>
+                        <HashRouter>
+                            <Layout>
+                                <Routes>
+                                    <Route path="/auth" element={<Auth />} />
+                                    <Route path="/" element={<PrivateRoute><Calculator /></PrivateRoute>} />
+                                    <Route path="/results" element={<PrivateRoute><Results /></PrivateRoute>} />
+                                    <Route path="/saved" element={<PrivateRoute><SavedProducts /></PrivateRoute>} />
+                                </Routes>
+                            </Layout>
+                        </HashRouter>
+                    </AppProvider>
+                </SidebarProvider>
+            </AuthProvider>
+        </ThemeProvider>
     );
 };
 
