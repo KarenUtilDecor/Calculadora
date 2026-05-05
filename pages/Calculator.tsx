@@ -241,7 +241,9 @@ const Calculator: React.FC = () => {
                     let sp = 0, mlShip = 0;
                     for (let i = 0; i < 8; i++) {
                         const estimatedPrice = sp || cmvTotal * 2;
-                        if (mlWeightKg > 0) {
+                        if (shV > 0) {
+                            mlShip = shV;
+                        } else if (mlWeightKg > 0) {
                             // Frete grátis rápido automático: se preço < 79
                             if (estimatedPrice < 79) {
                                 mlShip = getMLFreeShippingFastCost(mlWeightKg, mlReputationDiscount);
@@ -255,7 +257,9 @@ const Calculator: React.FC = () => {
                     }
 
                     // Recalcular frete final com preço convergido
-                    if (mlWeightKg > 0) {
+                    if (shV > 0) {
+                        mlShip = shV;
+                    } else if (mlWeightKg > 0) {
                         if (sp < 79) {
                             mlShip = getMLFreeShippingFastCost(mlWeightKg, mlReputationDiscount);
                         } else {
@@ -518,9 +522,12 @@ const Calculator: React.FC = () => {
                                         <CurrencyInput label="Taxa Fixa (Plat.)" value={fixedTax}
                                             onChange={(v) => { if (platform === 'other') setFixedTax(v); }} />
                                     )}
-                                    {platform !== 'ml' && (
-                                        <CurrencyInput label="Frete de Envio" value={shippingCost} onChange={setShippingCost} />
-                                    )}
+                                    <CurrencyInput 
+                                        label={platform === 'ml' ? "Taxa de Frete" : "Frete de Envio"} 
+                                        value={shippingCost} 
+                                        onChange={setShippingCost} 
+                                        placeholder={platform === 'ml' ? "Fixo/Manual" : undefined}
+                                    />
                                 </div>
                             )}
                             <div className="grid grid-cols-2 gap-2">
