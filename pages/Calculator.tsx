@@ -129,6 +129,7 @@ const Calculator: React.FC = () => {
 
     // ML specific
     const [hasFreeShipping, setHasFreeShipping] = useState(false);
+    const [mlOfferFreeShippingUnder19, setMlOfferFreeShippingUnder19] = useState(false);
     const [weight, setWeight] = useState('');
     const [mlListingType, setMlListingType] = useState<'classic' | 'premium'>('classic');
     const [mlReputationDiscount, setMlReputationDiscount] = useState<number>(0);
@@ -244,11 +245,12 @@ const Calculator: React.FC = () => {
                         if (shV > 0) {
                             mlShip = shV;
                         } else if (mlWeightKg > 0) {
-                            // Frete grátis rápido automático: se preço < 79
-                            if (estimatedPrice < 79) {
-                                mlShip = getMLFreeShippingFastCost(mlWeightKg, mlReputationDiscount);
+                            const baseCost = getMLShippingCost(estimatedPrice, mlWeightKg, mlReputationDiscount);
+                            if (estimatedPrice < 19 && mlOfferFreeShippingUnder19) {
+                                const fullFreight = getMLFreeShippingFastCost(mlWeightKg, mlReputationDiscount);
+                                mlShip = baseCost + fullFreight;
                             } else {
-                                mlShip = getMLShippingCost(estimatedPrice, mlWeightKg, mlReputationDiscount);
+                                mlShip = baseCost;
                             }
                         } else {
                             mlShip = 0;
@@ -260,15 +262,17 @@ const Calculator: React.FC = () => {
                     if (shV > 0) {
                         mlShip = shV;
                     } else if (mlWeightKg > 0) {
-                        if (sp < 79) {
-                            mlShip = getMLFreeShippingFastCost(mlWeightKg, mlReputationDiscount);
+                        const baseCost = getMLShippingCost(sp, mlWeightKg, mlReputationDiscount);
+                        if (sp < 19 && mlOfferFreeShippingUnder19) {
+                            const fullFreight = getMLFreeShippingFastCost(mlWeightKg, mlReputationDiscount);
+                            mlShip = baseCost + fullFreight;
                         } else {
-                            mlShip = getMLShippingCost(sp, mlWeightKg, mlReputationDiscount);
+                            mlShip = baseCost;
                         }
                     }
 
                     // Auto-set frete grátis baseado no preço
-                    setHasFreeShipping(sp < 79);
+                    setHasFreeShipping(sp >= 19 || (sp < 19 && mlOfferFreeShippingUnder19));
 
                     setMlComputedShipping(mlShip);
 
@@ -298,7 +302,7 @@ const Calculator: React.FC = () => {
     }, [cmvTotal, commission, fixedTax, shippingCost, adTaxPercent, discountPercent,
         incomeTaxPercent, breakagePercent, collabPercent, targetProfit, weight, margin,
         calculationMode, desiredPrice, platform, mlListingType,
-        mlWeightKg, mlReputationDiscount]);
+        mlWeightKg, mlReputationDiscount, mlOfferFreeShippingUnder19]);
 
     const handleCalculate = () => {
         if (!previewResult) return;
@@ -439,16 +443,38 @@ const Calculator: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Peso do produto */}
-                                <DebouncedInput value={weight} onValueChange={setWeight} label="Peso do Produto (kg)" placeholder="Ex: 0.5"
-                                    inputClassName="w-full rounded-lg border border-border bg-input-surface py-2 pl-3 pr-10 text-white placeholder-text-sec focus:border-brand-ml focus:ring-1 focus:ring-brand-ml outline-none transition-all font-semibold text-sm" />
+                                {/* Peso do produto e Frete */}
+                                <div className="grid grid-cols-2 gap-2">
+                                    <DebouncedInput value={weight} onValueChange={setWeight} label="Peso do Produto (kg)" placeholder="Ex: 0.5"
+                                        inputClassName="w-full rounded-lg border border-border bg-input-surface py-2 pl-3 pr-10 text-white placeholder-text-sec focus:border-brand-ml focus:ring-1 focus:ring-brand-ml outline-none transition-all font-semibold text-sm" />
+                                    <CurrencyInput label="Frete Fixo (Opcional)" value={shippingCost} onChange={setShippingCost} placeholder="Substitui peso" />
+                                </div>
+
+                                {/* Opção de Frete Grátis Opcional (< R$ 19) */}
+                                <label className="flex items-center gap-2 mt-1 cursor-pointer group w-fit">
+                                    <div className="relative flex items-center justify-center w-5 h-5 rounded border border-border bg-input-surface group-hover:border-brand-ml transition-colors">
+                                        <input type="checkbox" className="peer sr-only" checked={mlOfferFreeShippingUnder19} onChange={(e) => setMlOfferFreeShippingUnder19(e.target.checked)} />
+                                        <span className="material-symbols-outlined text-[14px] text-transparent peer-checked:text-brand-ml transition-colors font-bold">check</span>
+                                    </div>
+                                    <span className="text-xs font-medium text-text-sec group-hover:text-white transition-colors">
+                                        Oferecer Frete Grátis (apenas se {'<'} R$ 19)
+                                    </span>
+                                </label>
 
                                 {/* Indicador de frete grátis automático */}
-                                {previewResult && hasFreeShipping && (
-                                    <div className="flex items-center gap-2 p-2 rounded-lg bg-brand-ml/10 border border-brand-ml/20 text-xs">
+                                {previewResult && (
+                                    <div className="flex items-center gap-2 p-2 rounded-lg bg-brand-ml/10 border border-brand-ml/20 text-xs mt-1">
                                         <span className="material-symbols-outlined text-brand-ml text-sm filled">local_shipping</span>
-                                        <span className="text-brand-ml font-bold">Frete Grátis Rápido ativo</span>
-                                        <span className="text-text-sec">— Produto abaixo de R$79</span>
+                                        <span className="text-brand-ml font-bold">
+                                            {previewResult.price < 19
+                                                ? (mlOfferFreeShippingUnder19 ? 'Frete Grátis Opcional Ativo' : 'Frete por conta do comprador')
+                                                : 'Frete Grátis Obrigatório'}
+                                        </span>
+                                        <span className="text-text-sec">
+                                            {previewResult.price < 19
+                                                ? (mlOfferFreeShippingUnder19 ? '— Você paga Taxa Fixa + Frete integral' : '— Você paga apenas a Taxa Fixa por unidade')
+                                                : '— Custo de frete subsidiado pelo ML'}
+                                        </span>
                                     </div>
                                 )}
                             </div>
@@ -519,15 +545,12 @@ const Calculator: React.FC = () => {
                                 <div className="grid grid-cols-2 gap-2 pb-2 mb-2 border-b border-border/50">
                                     <PercentInput label="Comissão" value={commission} onChange={setCommission} />
                                     {platform !== 'ml' && (
-                                        <CurrencyInput label="Taxa Fixa (Plat.)" value={fixedTax}
-                                            onChange={(v) => { if (platform === 'other') setFixedTax(v); }} />
+                                        <>
+                                            <CurrencyInput label="Taxa Fixa (Plat.)" value={fixedTax}
+                                                onChange={(v) => { if (platform === 'other') setFixedTax(v); }} />
+                                            <CurrencyInput label="Frete de Envio" value={shippingCost} onChange={setShippingCost} />
+                                        </>
                                     )}
-                                    <CurrencyInput 
-                                        label={platform === 'ml' ? "Taxa de Frete" : "Frete de Envio"} 
-                                        value={shippingCost} 
-                                        onChange={setShippingCost} 
-                                        placeholder={platform === 'ml' ? "Fixo/Manual" : undefined}
-                                    />
                                 </div>
                             )}
                             <div className="grid grid-cols-2 gap-2">
@@ -617,7 +640,9 @@ const Calculator: React.FC = () => {
                                 <span className="material-symbols-outlined text-brand-ml text-lg">payments</span>
                                 <div className="flex flex-col">
                                     <span className="text-sm font-bold text-brand-ml">Custo de Frete ML</span>
-                                    <span className="text-[10px] text-text-sec">{hasFreeShipping ? 'Frete Grátis Rápido (< R$79)' : 'Frete por peso e preço'}</span>
+                                    <span className="text-[10px] text-text-sec">
+                                        {previewResult.price >= 19 ? 'Subsidiado (≥ R$19)' : (mlOfferFreeShippingUnder19 ? 'Taxa Fixa + Frete (< R$19)' : 'Apenas Taxa Fixa (< R$19)')}
+                                    </span>
                                 </div>
                             </div>
                             <span className="text-lg font-extrabold text-white">
