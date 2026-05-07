@@ -1,4 +1,4 @@
-export type Platform = 'ml' | 'shopee' | 'shein' | 'other';
+export type Platform = 'ml' | 'shopee' | 'shein' | 'tiktok' | 'other';
 
 export interface ProductData {
     id: string;

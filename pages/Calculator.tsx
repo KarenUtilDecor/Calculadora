@@ -141,6 +141,9 @@ const Calculator: React.FC = () => {
     const [sheinWidth, setSheinWidth] = useState('');
     const [sheinLength, setSheinLength] = useState('');
 
+    // TikTok specific
+    const [tiktokAffiliatePercent, setTiktokAffiliatePercent] = useState('');
+
     // ML weight in kg (simple parse)
     const mlWeightKg = useMemo(() => parseFloat(weight) || 0, [weight]);
 
@@ -153,6 +156,8 @@ const Calculator: React.FC = () => {
         } else if (p === 'shein') {
             setCommission('20');
             recalcSheinFee(sheinHeight, sheinWidth, sheinLength);
+        } else if (p === 'tiktok') {
+            setCommission('6'); setFixedTax('4'); setShippingCost('');
         }
     };
 
@@ -184,6 +189,7 @@ const Calculator: React.FC = () => {
             const bv = parseFloat(breakagePercent) || 0;
             const cv = parseFloat(collabPercent) || 0;
             const opCost = parseFloat(operationCostPercent) || 0;
+            const tiktokAff = platform === 'tiktok' ? (parseFloat(tiktokAffiliatePercent) || 0) : 0;
 
             if (platform === 'shopee') {
                 const otherVar = itv + atv + dv + bv + cv + opCost;
@@ -229,7 +235,7 @@ const Calculator: React.FC = () => {
 
                 if (cmvTotal === 0 && calculationMode !== 'price') { setPreviewResult(null); return; }
 
-                const totalVarP = commV + atv + dv + itv + bv + cv + opCost;
+                const totalVarP = commV + atv + dv + itv + bv + cv + opCost + tiktokAff;
 
                 if (platform === 'ml') {
                     // Nova lógica ML: frete baseado em peso × preço (sem taxa fixa separada)
@@ -302,7 +308,7 @@ const Calculator: React.FC = () => {
 
         return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
     }, [cmvTotal, commission, fixedTax, shippingCost, adTaxPercent, discountPercent,
-        incomeTaxPercent, breakagePercent, collabPercent, operationCostPercent, targetProfit, weight, margin,
+        incomeTaxPercent, breakagePercent, collabPercent, operationCostPercent, tiktokAffiliatePercent, targetProfit, weight, margin,
         calculationMode, desiredPrice, platform, mlListingType,
         mlWeightKg, mlReputationDiscount, mlOfferFreeShippingUnder19]);
 
@@ -317,7 +323,8 @@ const Calculator: React.FC = () => {
         const bv = parseFloat(breakagePercent) || 0;
         const cv = parseFloat(collabPercent) || 0;
         const opCost = parseFloat(operationCostPercent) || 0;
-        const totalVP = commV + atv + dv + itv + bv + cv + opCost;
+        const tiktokAff = platform === 'tiktok' ? (parseFloat(tiktokAffiliatePercent) || 0) : 0;
+        const totalVP = commV + atv + dv + itv + bv + cv + opCost + tiktokAff;
         const totalTaxes = (previewResult.price * (totalVP / 100)) + ftV;
 
         const product: ProductData = {
@@ -359,11 +366,12 @@ const Calculator: React.FC = () => {
                             <span className="material-symbols-outlined text-primary text-base">store</span>
                             Escolha a Plataforma
                         </h3>
-                        <div className="bg-surface p-3 rounded-xl border border-border grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div className="bg-surface p-3 rounded-xl border border-border grid grid-cols-2 sm:grid-cols-5 gap-2">
                             {[
                                 { id: 'ml', name: 'Mercado Livre', icon: 'storefront', color: 'bg-brand-ml', text: 'text-black' },
                                 { id: 'shopee', name: 'Shopee', icon: 'shopping_bag', color: 'bg-brand-shopee', text: 'text-white' },
                                 { id: 'shein', name: 'Shein', icon: 'checkroom', color: 'bg-white', text: 'text-black' },
+                                { id: 'tiktok', name: 'TikTok Shop', icon: 'play_circle', color: 'bg-black', text: 'text-brand-tiktok' },
                                 { id: 'other', name: 'Outro', icon: 'add_circle', color: 'bg-surface', border: true, text: 'text-white' }
                             ].map((p: any) => (
                                 <button key={p.id} onClick={() => handlePlatformChange(p.id as Platform)}
@@ -508,6 +516,26 @@ const Calculator: React.FC = () => {
                         </section>
                     )}
 
+                    {/* TikTok Shop Specific */}
+                    {platform === 'tiktok' && (
+                        <section className="flex flex-col gap-3">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-brand-tiktok text-base">play_circle</span>
+                                Configurações TikTok Shop
+                            </h3>
+                            <div className="bg-surface p-3 rounded-xl border border-border flex flex-col gap-3">
+                                <div className="flex items-center gap-2 p-2 rounded-lg bg-brand-tiktok/10 border border-brand-tiktok/20 text-xs">
+                                    <span className="material-symbols-outlined text-brand-tiktok text-sm filled">info</span>
+                                    <span className="text-text-sec">
+                                        Comissão: <strong className="text-brand-tiktok">6%</strong> · Taxa fixa: <strong className="text-brand-tiktok">R$ 4,00</strong> por item
+                                    </span>
+                                </div>
+                                <PercentInput label="Comissão de Afiliado (opcional)" value={tiktokAffiliatePercent} onChange={setTiktokAffiliatePercent} placeholder="Ex: 10" />
+                                <CurrencyInput label="Frete de Envio" value={shippingCost} onChange={setShippingCost} />
+                            </div>
+                        </section>
+                    )}
+
                     {/* Shopee Commission Table */}
                     {platform === 'shopee' && (
                         <section className="flex flex-col gap-3">
@@ -543,8 +571,8 @@ const Calculator: React.FC = () => {
                             Custos Variáveis de Venda
                         </h3>
                         <div className="bg-surface p-3 rounded-xl border border-border grid gap-2">
-                            {/* Non-Shopee: Commission, Fixed Tax, Shipping */}
-                            {platform !== 'shopee' && (
+                            {/* Non-Shopee/TikTok: Commission, Fixed Tax, Shipping */}
+                            {platform !== 'shopee' && platform !== 'tiktok' && (
                                 <div className="grid grid-cols-2 gap-2 pb-2 mb-2 border-b border-border/50">
                                     <PercentInput label="Comissão" value={commission} onChange={setCommission} />
                                     {platform !== 'ml' && (
