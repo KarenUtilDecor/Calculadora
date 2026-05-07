@@ -371,14 +371,16 @@ const Calculator: React.FC = () => {
                                 { id: 'ml', name: 'Mercado Livre', icon: 'storefront', color: 'bg-brand-ml', text: 'text-black' },
                                 { id: 'shopee', name: 'Shopee', icon: 'shopping_bag', color: 'bg-brand-shopee', text: 'text-white' },
                                 { id: 'shein', name: 'Shein', icon: 'checkroom', color: 'bg-white', text: 'text-black' },
-                                { id: 'tiktok', name: 'TikTok Shop', icon: 'play_circle', color: 'bg-black', text: 'text-brand-tiktok' },
+                                { id: 'tiktok', name: 'TikTok Shop', img: '/tiktok-logo.svg', color: 'bg-black', text: 'text-white' },
                                 { id: 'other', name: 'Outro', icon: 'add_circle', color: 'bg-surface', border: true, text: 'text-white' }
                             ].map((p: any) => (
                                 <button key={p.id} onClick={() => handlePlatformChange(p.id as Platform)}
                                     className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 h-full group
                                         ${platform === p.id ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
                                         ${p.border ? 'border border-border hover:border-primary' : ''} ${p.color}`}>
-                                    <span className={`material-symbols-outlined text-2xl mb-1 group-hover:scale-110 transition-transform ${p.text}`}>{p.icon}</span>
+                                    {p.img
+                                        ? <img src={p.img} alt={p.name} className="w-7 h-7 mb-1 group-hover:scale-110 transition-transform rounded-md" />
+                                        : <span className={`material-symbols-outlined text-2xl mb-1 group-hover:scale-110 transition-transform ${p.text}`}>{p.icon}</span>}
                                     <span className={`text-xs font-bold text-center ${p.text}`}>{p.name}</span>
                                 </button>
                             ))}
