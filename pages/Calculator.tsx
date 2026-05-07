@@ -120,6 +120,7 @@ const Calculator: React.FC = () => {
     const [discountPercent, setDiscountPercent] = useState('');
     const [breakagePercent, setBreakagePercent] = useState('');
     const [collabPercent, setCollabPercent] = useState('');
+    const [operationCostPercent, setOperationCostPercent] = useState('');
 
     // Goals
     const [margin, setMargin] = useState(20);
@@ -182,9 +183,10 @@ const Calculator: React.FC = () => {
             const dv = parseFloat(discountPercent) || 0;
             const bv = parseFloat(breakagePercent) || 0;
             const cv = parseFloat(collabPercent) || 0;
+            const opCost = parseFloat(operationCostPercent) || 0;
 
             if (platform === 'shopee') {
-                const otherVar = itv + atv + dv + bv + cv;
+                const otherVar = itv + atv + dv + bv + cv + opCost;
                 let price = 0, mc = 0, mcP = 0, cPerc = 0, fFee = 0, bLabel = '';
 
                 if (calculationMode === 'price') {
@@ -227,7 +229,7 @@ const Calculator: React.FC = () => {
 
                 if (cmvTotal === 0 && calculationMode !== 'price') { setPreviewResult(null); return; }
 
-                const totalVarP = commV + atv + dv + itv + bv + cv;
+                const totalVarP = commV + atv + dv + itv + bv + cv + opCost;
 
                 if (platform === 'ml') {
                     // Nova lógica ML: frete baseado em peso × preço (sem taxa fixa separada)
@@ -300,7 +302,7 @@ const Calculator: React.FC = () => {
 
         return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
     }, [cmvTotal, commission, fixedTax, shippingCost, adTaxPercent, discountPercent,
-        incomeTaxPercent, breakagePercent, collabPercent, targetProfit, weight, margin,
+        incomeTaxPercent, breakagePercent, collabPercent, operationCostPercent, targetProfit, weight, margin,
         calculationMode, desiredPrice, platform, mlListingType,
         mlWeightKg, mlReputationDiscount, mlOfferFreeShippingUnder19]);
 
@@ -314,7 +316,8 @@ const Calculator: React.FC = () => {
         const itv = parseFloat(incomeTaxPercent) || 0;
         const bv = parseFloat(breakagePercent) || 0;
         const cv = parseFloat(collabPercent) || 0;
-        const totalVP = commV + atv + dv + itv + bv + cv;
+        const opCost = parseFloat(operationCostPercent) || 0;
+        const totalVP = commV + atv + dv + itv + bv + cv + opCost;
         const totalTaxes = (previewResult.price * (totalVP / 100)) + ftV;
 
         const product: ProductData = {
@@ -324,7 +327,7 @@ const Calculator: React.FC = () => {
             printingCost: parseFloat(printingCost) || 0, cmvTotal,
             cost: cmvTotal, fixedCost: 0, shippingCost: shV,
             adTaxPercent: atv, discountPercent: dv, taxPercent: commV, taxFixed: ftV,
-            incomeTaxPercent: itv, breakagePercent: bv, collabPercent: cv,
+            incomeTaxPercent: itv, breakagePercent: bv, collabPercent: cv, operationCostPercent: opCost,
             marginTarget: previewResult.margin, targetProfit: previewResult.profit,
             targetPrice: parseFloat(desiredPrice) || 0, calculationMode, platform,
             hasFreeShipping: platform === 'ml' ? hasFreeShipping : false,
@@ -559,6 +562,7 @@ const Calculator: React.FC = () => {
                                 <PercentInput label="Perca / Quebra" value={breakagePercent} onChange={setBreakagePercent} />
                                 <PercentInput label="Comissão Colab" value={collabPercent} onChange={setCollabPercent} />
                                 <PercentInput label="Desconto Promo." value={discountPercent} onChange={setDiscountPercent} />
+                                <PercentInput label="Custo Total Op." value={operationCostPercent} onChange={setOperationCostPercent} />
                             </div>
                         </div>
                     </section>

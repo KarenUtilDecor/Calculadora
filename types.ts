@@ -23,6 +23,7 @@ export interface ProductData {
     incomeTaxPercent?: number; // Imposto de Venda
     breakagePercent?: number;  // Perca/Quebra
     collabPercent?: number;    // Comissão Colab
+    operationCostPercent?: number; // Custo Total de Operação
     marginTarget: number;
     targetProfit?: number;     // Lucro desejado em R$
     targetPrice?: number;      // Preço de venda desejado em R$
